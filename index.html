@@ -1,0 +1,104 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Paint By Numbers</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            outline: 0;
+            list-style: none;
+            font-size: 16px;
+            font-family: ‘Helvetica Neue’, Helvetica, Arial, sans-serif;
+        }
+
+        h1 {
+            font-size:2em;
+            margin:0.3em 0;
+        }
+
+        input[type="text"], input[type="number"] {
+            font-size:0.9em;
+            padding:2px;
+        }
+
+        #container {
+            width: 960px;
+            margin: 0 auto;
+        }
+
+        #config ul li {
+            line-height:2.0em;
+        }
+
+        #config ul li>label {
+            display:inline-block;
+            width:190px;
+        }
+
+        #config ul li .info {
+            color:#666;
+            font-size:0.8em;
+            line-height:1.0em;
+        }
+
+        #config ul li input[type="number"] {
+            width:80px;
+        }
+
+        #config ul li input[type="color"]{
+            width:60px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Paint By Numbers</h1>
+        <div id="cv-container">
+            <canvas id="cv"></canvas>
+        </div>
+        <div id="config">
+            <ul>
+                <li>
+                    <label>Canvas size:</label>
+                    X: <input type="number" value="1280" id="txtCanvasX" /> 
+                    Y: <input type="number" value="720" id="txtCanvasY" />
+                </li>
+                <li>
+                    <label>Grid size/color:</label>
+                    <input type="number" value="4" name="txtGridSize" />
+                    <input type="color" value="#b0b0b0" name="colGridColor" />
+                </li>
+                <li>
+                    <label>Gridline emphasis color:</label>
+                    <input type="color" value="#808080" name="colEmphasisColor" />
+                    <label class="info">Optional color every 10 cells</label>
+                </li>
+                <li>
+                    <label>Twitch channels:</label>
+                    <input type="text" id="txtChannels" />
+                    <p class="info">Comma-separated list of Twitch channels to connect to</p>
+                </li>
+                <li>
+                    <label>Config name:</label>
+                    <input type="text" id="txtName" />
+                    <p class="info">If a name is set, then this config can be loaded with only the name</p>
+                </li>
+            </ul>
+        </div>
+
+        <div id="history">
+
+        </div>
+
+
+    </div>
+
+
+
+
+    <script>
+
+    </script>
+</body>
+</html>
