@@ -17,6 +17,15 @@
             margin:0.3em 0;
         }
 
+        #cv-container {
+            width:100%;
+            text-align:center;
+        }
+
+        #cv {
+            margin:0 auto;
+        }
+
         input[type="text"], input[type="number"] {
             font-size:0.9em;
             padding:2px;
@@ -43,7 +52,7 @@
 
         #config ul li>label {
             display:inline-block;
-            width:190px;
+            width:200px;
         }
 
         #config ul li .info {
@@ -51,6 +60,10 @@
             font-size:0.8em;
             line-height:1.0em;
             margin-bottom:0.4em;
+        }
+
+        #config ul li .info em {
+            font-size:100%;
         }
 
         #config ul li input[type="number"] {
@@ -69,7 +82,7 @@
             font-size: 22px;
             display: inline-block;
             height: 1em !important;
-            width: 3em !important;
+            width: 2.7em !important;
             cursor: pointer;
             vertical-align:middle;
         }
@@ -127,22 +140,37 @@
                     Y: <input type="number" value="720" id="txtCanvasY" />
                 </li>
                 <li>
-                    <label>Grid size/color:</label>
+                    <label>Grid lines enabled:</label>
                     <label class="switch">
                         <input type="checkbox" id="cbShowGrid" checked />
                         <span></span>
                     </label>
-                    <input type="number" value="4" name="txtGridSize" />
-                    <input type="color" value="#b0b0b0" name="colGridColor" />
                 </li>
                 <li>
-                    <label>Gridline emphasis color:</label>
+                    <label>Grid size/color:</label>
+                    <input type="number" value="4" id="txtGridSize" />
+                    <input type="color" value="#b0b0b0" id="colGridColor" />
+                </li>
+                <li>
+                    <label>Grid line underlap</label>
                     <label class="switch">
-                        <input type="checkbox" id="cbShowGridHighlight" checked />
+                        <input type="checkbox" id="cbGridUnderlap" checked />
                         <span></span>
                     </label>
-                    <input type="color" value="#808080" name="colEmphasisColor" />
-                    <p class="info">Optional color every 10 cells</p>
+                    <p class="info">If enabled, the drawn cells will overlap the grid lines, resulting in full coverage</p>
+                </li>
+                <li>
+                    <label>Emphasis lines enabled:</label>
+                    <label class="switch">
+                        <input type="checkbox" id="cbShowGridEmphasis" checked />
+                        <span></span>
+                    </label>
+                </li>
+                <li>
+                    <label>Emphasis frequency/color:</label>
+                    <input type="number" value="10" id="txtEmphasisFrequency" />
+                    <input type="color" value="#808080" id="colEmphasisColor" />
+                    <p class="info">Optional color every <em>n</em> cells</p>
                 </li>
                 <li>
                     <label>Twitch channels:</label>
@@ -475,6 +503,8 @@
             canvas, //internal canvas object
             ctx, //canvas context
 
+            settingsTimerId=-1, //timer variable for UI delay on update
+
             queryList = {}, //name-indexed list of query string parameters
             history = [], //history of draw orders given
 
@@ -482,26 +512,17 @@
 
         var config = {
             CanvasWidth: 1280,
-            CanvasHeight:720,
+            CanvasHeight: 720,
             GridEnabled: true,
             GridSize: 4,
-            GridUnderlap:false,
             GridColor: '#b0b0b0',
-            GridHighlightEnabled: true,
-            GridHighlightColor: '808080',
-            TwitchChannels: []
+            GridUnderlap: false,
+            GridEmphasisEnabled: true,
+            GridEmphasisFrequency: 10,
+            GridEmphasisColor: '808080',
+            TwitchChannels: [],
+            Name: 'default'
         };
-
-        //create queryList array
-        if (window.location.search) {
-            var query = window.location.search;
-            var queryParts = query.substring(1).split('&');
-            for (var i = 0; i < queryParts.length; i++) {
-                var parts = queryParts[i].split('=');
-                queryList[parts[0].trim()] = parts[1].trim();
-
-            }
-        }
 
 
         /*************/
@@ -575,7 +596,8 @@
 
         function GetChatObject(str) {
             var ret = {};
-            var parts = str.split(';');
+            var mainParts = str.split('PRIVMSG');
+            var parts = mainParts[0].split(';');
 
             for (var i = 0; i < parts.length; i++) {
                 var subparts = parts[i].split('=');
@@ -586,14 +608,95 @@
             return ret;
         }
 
-        if (queryList["channel"]) {
-            Connect();
+
+
+
+
+        /*************/
+        /*   INIT    */
+        /*************/
+
+        (function () {
+
+            //bind UI update events
+            txtCanvasX.oninput = UpdateSettingsTrigger;
+            txtCanvasY.oninput = UpdateSettingsTrigger;
+            cbShowGrid.onchange = UpdateSettingsTrigger;
+            txtGridSize.oninput = UpdateSettingsTrigger;
+            colGridColor.onchange = UpdateSettingsTrigger;
+            cbGridUnderlap.onchange = UpdateSettingsTrigger;
+            cbShowGridEmphasis.onchange = UpdateSettingsTrigger;
+            txtEmphasisFrequency.oninput = UpdateSettingsTrigger;
+            colEmphasisColor.onchange = UpdateSettingsTrigger;
+            txtChannels.oninput = UpdateSettingsTrigger;
+            txtName.oninput = UpdateSettingsTrigger;
+
+
+            //create queryList array
+            if (window.location.search) {
+                var query = window.location.search;
+                var queryParts = query.substring(1).split('&');
+                for (var i = 0; i < queryParts.length; i++) {
+                    var parts = queryParts[i].split('=');
+                    queryList[parts[0].trim()] = parts[1].trim();
+
+                }
+            }
+
+
+
+            if (queryList["config"]) {
+                LoadSettings(queryList["config"]);
+            }
+
+
+
+
+
+            if (config.TwitchChannels.length > 0) {
+                Connect();
+            }
+
+
+
+
+        })();
+
+
+        function UpdateSettingsTrigger() {
+            clearTimeout(settingsTimerId);
+            settingsTimerId = setTimeout(UpdateSettings, 1000);
         }
 
+        var updateCount = 0;
+        function UpdateSettings() {
+            console.log('update trigger ' + ++updateCount);
+            
+            config.CanvasWidth = parseInt(txtCanvasX.value, 10);
+            config.CanvasHeight = parseInt(txtCanvasY.value, 10);
+            config.GridEnabled = cbShowGrid.checked;
+            config.GridSize = parseInt(txtGridSize.value, 10);
+            config.GridColor = colGridColor.value;
+            config.GridUnderlap = cbGridUnderlap.checked;
+            config.GridEmphasisEnabled = cbShowGridEmphasis.checked;
+            config.GridEmphasisFrequency = parseInt(txtEmphasisFrequency.value, 10);
+            config.GridEmphasisColor = colEmphasisColor.value;
+            config.TwitchChannels = txtChannels.value.split(',');
+            if (txtName.value.trim() != '')
+                config.Name = txtName.value.trim();
 
+            SaveSettings();
+        }
 
+        function SaveSettings() {
 
+            localStorage.setItem('pbn-' + config.Name, JSON.stringify(config));
+            console.log('settings saved');
+        }
 
+        function LoadSettings(configName) {
+
+        }
 
 
 
