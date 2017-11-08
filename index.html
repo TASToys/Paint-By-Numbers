@@ -133,6 +133,10 @@
                     left: 50%;
                 }
 
+
+                .input-small {
+                    width:150px !important;
+                }
     </style>
 </head>
 <body>
@@ -195,13 +199,21 @@
             <hr />
             <ul>
                 <li>
-                    <label>Effective size:</label>
+                    <label>Grid size:</label>
+                    <input type="text" id="txtGridSizeOutput" class="input-small" readonly />
+                </li>
+                <li>
+                    <label>Effective canvas size:</label>
                     X: <input type="number" value="1280" id="txtEffectiveX" readonly />
                     Y: <input type="number" value="720" id="txtEffectiveY" readonly />
                 </li>
                 <li>
                     <label>Seed URL:</label>
                     <input type="text" id="txtSeedURL" readonly />
+                </li>
+                <li>
+                    <label>Quick-load URL:</label>
+                    <input type="text" id="txtQuickURL" readonly />
                 </li>
             </ul>
         </div>
@@ -671,11 +683,12 @@
             canvas = document.getElementById('cv');
 
 
-            if (queryList["config"]) {
+            if (queryList["config"] && localStorage.getItem(queryList["config"]) != null) {
+
                 LoadSettings(queryList["config"]);
             }
             else {
-                UpdateSettingsTrigger();
+                UpdateSettings();
             }
 
 
@@ -695,7 +708,7 @@
         function UpdateSettingsTrigger() {
             if (!isLoading) {
                 clearTimeout(settingsTimerId);
-                settingsTimerId = setTimeout(UpdateSettings, 1000);
+                settingsTimerId = setTimeout(UpdateSettings, 500);
             }
         }
 
@@ -710,11 +723,17 @@
             config.GridEmphasisEnabled = cbShowGridEmphasis.checked;
             config.GridEmphasisFrequency = parseInt(txtEmphasisFrequency.value, 10);
             config.GridEmphasisColor = colEmphasisColor.value;
-            config.TwitchChannels = txtChannels.value.split(',');
+            if (txtChannels.value.trim() != '')
+                config.TwitchChannels = txtChannels.value.split(',').map(function (x) { return x.trim(); });
+            else
+                config.TwitchChannels = [];
+
             if (txtName.value.trim() != '')
                 config.Name = txtName.value.trim();
+            else
+                config.Name = 'default';
 
-
+            txtQuickURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
 
             SaveSettings();
 
@@ -724,17 +743,34 @@
         function SaveSettings() {
 
             localStorage.setItem('pbn-' + config.Name, JSON.stringify(config));
-            console.log('settings saved');
+            if (debug)
+                console.log('settings saved');
         }
 
         function LoadSettings(configName) {
             isLoading = true;
 
             //TODO
+            config = JSON.parse(localStorage.getItem(configName));
+            if (debug)
+                console.log(config);
 
+            txtCanvasX.value = config.CanvasWidth;
+            txtCanvasY.value = config.CanvasHeight;
+            cbShowGrid.checked = config.GridEnabled;
+            txtGridSize.value = config.GridSize;
+            colGridColor.value = config.GridColor;
+            cbGridUnderlap.checked = config.GridUnderlap;
+            cbShowGridEmphasis.checked = config.GridEmphasisEnabled;
+            txtEmphasisFrequency.value = config.GridEmphasisFrequency;
+            colEmphasisColor.value = config.GridEmphasisColor;
+            txtChannels.value = config.TwitchChannels.join(', ');
+            txtName.value = config.Name;
 
+            txtQuickURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
 
             isLoading = false;
+            DrawGrid();
         }
 
 
@@ -764,6 +800,8 @@
 
             txtEffectiveX.value = effectiveWidth;
             txtEffectiveY.value = effectiveHeight;
+
+            txtGridSizeOutput.value = (gridDimX) + 'x' + (gridDimY);
 
             ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = false;
