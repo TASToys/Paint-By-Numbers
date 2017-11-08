@@ -13,17 +13,21 @@
         }
 
         h1 {
-            font-size:2em;
-            margin:0.3em 0;
+            font-size: 2em;
+            margin: 0.3em 0;
+            width: 960px;
+            margin: 0 auto;
         }
 
         #cv-container {
             width:100%;
             text-align:center;
+            margin-bottom:20px;
         }
 
         #cv {
             margin:0 auto;
+            border:1px solid #000;
         }
 
         input[type="text"], input[type="number"] {
@@ -39,6 +43,7 @@
         #config {
             display:inline-block;
             width:60%;
+            margin-bottom:100px;
         }
 
         #history {
@@ -76,6 +81,10 @@
 
         #config ul li input[type="text"] {
             width:350px;
+        }
+
+        #config input[readonly]{
+            background-color:#eee;
         }
 
         label.switch {
@@ -127,16 +136,16 @@
     </style>
 </head>
 <body>
+    <h1>Paint By Numbers</h1>
+    <div id="cv-container">
+        <canvas id="cv"></canvas>
+    </div>
     <div id="container">
-        <h1>Paint By Numbers</h1>
-        <div id="cv-container">
-            <canvas id="cv"></canvas>
-        </div>
         <div id="config">
             <ul>
                 <li>
                     <label>Canvas size:</label>
-                    X: <input type="number" value="1280" id="txtCanvasX" /> 
+                    X: <input type="number" value="1280" id="txtCanvasX" />
                     Y: <input type="number" value="720" id="txtCanvasY" />
                 </li>
                 <li>
@@ -181,6 +190,18 @@
                     <label>Config name:</label>
                     <input type="text" id="txtName" />
                     <p class="info">If a name is set, then this config can be loaded with only the name</p>
+                </li>
+            </ul>
+            <hr />
+            <ul>
+                <li>
+                    <label>Effective size:</label>
+                    X: <input type="number" value="1280" id="txtEffectiveX" readonly />
+                    Y: <input type="number" value="720" id="txtEffectiveY" readonly />
+                </li>
+                <li>
+                    <label>Seed URL:</label>
+                    <input type="text" id="txtSeedURL" readonly />
                 </li>
             </ul>
         </div>
@@ -502,8 +523,12 @@
         var
             canvas, //internal canvas object
             ctx, //canvas context
+            imageData,
+            effectiveWidth = 0,
+            effectiveHeight = 0, //actual canvas dimensions calculated from grid settings
 
-            settingsTimerId=-1, //timer variable for UI delay on update
+            settingsTimerId = -1, //timer variable for UI delay on update
+            isLoading=false, //switch to ignore input change events while loading
 
             queryList = {}, //name-indexed list of query string parameters
             history = [], //history of draw orders given
@@ -643,10 +668,14 @@
                 }
             }
 
+            canvas = document.getElementById('cv');
 
 
             if (queryList["config"]) {
                 LoadSettings(queryList["config"]);
+            }
+            else {
+                UpdateSettingsTrigger();
             }
 
 
@@ -664,13 +693,13 @@
 
 
         function UpdateSettingsTrigger() {
-            clearTimeout(settingsTimerId);
-            settingsTimerId = setTimeout(UpdateSettings, 1000);
+            if (!isLoading) {
+                clearTimeout(settingsTimerId);
+                settingsTimerId = setTimeout(UpdateSettings, 1000);
+            }
         }
 
-        var updateCount = 0;
         function UpdateSettings() {
-            console.log('update trigger ' + ++updateCount);
             
             config.CanvasWidth = parseInt(txtCanvasX.value, 10);
             config.CanvasHeight = parseInt(txtCanvasY.value, 10);
@@ -685,7 +714,11 @@
             if (txtName.value.trim() != '')
                 config.Name = txtName.value.trim();
 
+
+
             SaveSettings();
+
+            DrawGrid();
         }
 
         function SaveSettings() {
@@ -695,9 +728,107 @@
         }
 
         function LoadSettings(configName) {
+            isLoading = true;
+
+            //TODO
+
+
+
+            isLoading = false;
+        }
+
+
+
+        function DrawGrid() {
+            var gridDimX, gridDimY;
+
+            if (config.GridEnabled && !config.GridUnderlap) {
+                gridDimX = Math.floor((config.CanvasWidth + 1) / (config.GridSize+1));
+                effectiveWidth = (gridDimX * (config.GridSize + 1)) - 1;
+
+                gridDimY = Math.floor((config.CanvasHeight + 1) / (config.GridSize+1));
+                effectiveHeight = (gridDimY * (config.GridSize + 1)) - 1;
+
+            }
+            else { //underlap and no grid at all have the same grid size calculation
+                gridDimX = Math.floor(config.CanvasWidth / config.GridSize);
+                effectiveWidth = gridDimX * config.GridSize;
+
+                gridDimY = Math.floor(config.CanvasHeight / config.GridSize);
+                effectiveHeight = gridDimY * config.GridSize;
+
+            }
+
+            canvas.width = effectiveWidth;
+            canvas.height = effectiveHeight;
+
+            txtEffectiveX.value = effectiveWidth;
+            txtEffectiveY.value = effectiveHeight;
+
+            ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (config.GridEnabled) {
+                var gridDrawSize = config.GridSize + (config.GridUnderlap ? 0 : 1);
+                ctx.strokeStyle = config.GridColor;
+                ctx.lineWidth = 1;
+
+                for (var x = 1; x < gridDimX; x++) {
+                    ctx.beginPath();
+                    ctx.moveTo((x * gridDrawSize)-0.5, 0);
+                    ctx.lineTo((x * gridDrawSize)-0.5, canvas.height);
+                    ctx.stroke();
+                }
+                for (var y = 1; y < gridDimY; y++) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, (y * gridDrawSize) - 0.5);
+                    ctx.lineTo(canvas.width, (y * gridDrawSize) - 0.5);
+                    ctx.stroke();
+                }
+
+                if (config.GridEmphasisEnabled) {
+                    ctx.strokeStyle = config.GridEmphasisColor;
+
+                    for (var x = 1; x < (gridDimX / config.GridEmphasisFrequency); x++) {
+                        ctx.beginPath();
+                        ctx.moveTo((x * config.GridEmphasisFrequency * gridDrawSize) - 0.5, 0);
+                        ctx.lineTo((x * config.GridEmphasisFrequency* gridDrawSize) - 0.5, canvas.height);
+                        ctx.stroke();
+
+                    }
+
+                    for (var y = 1; y < (gridDimY / config.GridEmphasisFrequency); y++) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, (y * config.GridEmphasisFrequency * gridDrawSize) - 0.5);
+                        ctx.lineTo(canvas.width, (y * config.GridEmphasisFrequency *gridDrawSize) - 0.5);
+                        ctx.stroke();
+
+                    }
+                }
+            }
+
+            //ctx.fillStyle='color';
+            //ctx.fillRect(x,y,w,h);
 
         }
 
+
+        function DrawPoint(x, y, c) {
+            for (var x2 = 0; x2 < config.GridSize; x2++) {
+                for (var y2 = 0; y2 < config.GridSize; y2++) {
+
+                    var index =
+                        (((x * config.GridSize) + x2) +
+                            ((y * config.GridSize) + y2) *
+                            canvas.width) * 4;
+                    imageData.data[index++] = c.R;
+                    imageData.data[index++] = c.G;
+                    imageData.data[index++] = c.B;
+                    imageData.data[index] = 255;
+                }
+            }
+        }
 
 
     </script>
