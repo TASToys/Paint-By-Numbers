@@ -556,7 +556,7 @@
             GridUnderlap: false,
             GridEmphasisEnabled: true,
             GridEmphasisFrequency: 10,
-            GridEmphasisColor: '808080',
+            GridEmphasisColor: '#808080',
             TwitchChannels: [],
             Name: 'default'
         };
@@ -683,15 +683,40 @@
             canvas = document.getElementById('cv');
 
 
-            if (queryList["config"] && localStorage.getItem(queryList["config"]) != null) {
 
-                LoadSettings(queryList["config"]);
+            if (queryList["config"]) {
+                if (localStorage.getItem(queryList["config"]) != null) {
+                    LoadSettings(queryList["config"]);
+                }
+                else {
+                    //config specified, but doesn't exist
+                    if (queryList["seed"]) {
+
+                        config = JSON.parse(atob(queryList["seed"]));
+                        SaveSettings();
+                        LoadSettings('pbn-' + config.Name);
+                    }
+                    else {
+                        //specified config doesn't exist, no seed, init defaults
+                        UpdateSettings();
+                    }
+
+
+
+                }
             }
             else {
-                UpdateSettings();
+                if (queryList["seed"]) {
+                    //no config, seed, load from seed
+                    config = JSON.parse(atob(queryList["seed"]));
+                    SaveSettings();
+                    LoadSettings('pbn-' + config.Name);
+                }
+                else {
+                    //no config, no seed, init defaults
+                    UpdateSettings();
+                }
             }
-
-
 
 
 
@@ -733,7 +758,7 @@
             else
                 config.Name = 'default';
 
-            txtQuickURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
+            UpdateURLs();
 
             SaveSettings();
 
@@ -767,12 +792,16 @@
             txtChannels.value = config.TwitchChannels.join(', ');
             txtName.value = config.Name;
 
-            txtQuickURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
+            UpdateURLs();
 
             isLoading = false;
             DrawGrid();
         }
 
+        function UpdateURLs() {
+            txtQuickURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
+            txtSeedURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name + '&seed=' + btoa(JSON.stringify(config));
+        }
 
 
         function DrawGrid() {
