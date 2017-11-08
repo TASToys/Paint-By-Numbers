@@ -20,19 +20,19 @@
         }
 
         #cv-container {
-            width:100%;
-            text-align:center;
-            margin-bottom:20px;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 20px;
         }
 
         #cv {
-            margin:0 auto;
-            border:1px solid #000;
+            margin: 0 auto;
+            border: 1px solid #000;
         }
 
         input[type="text"], input[type="number"] {
-            font-size:0.9em;
-            padding:2px;
+            font-size: 0.9em;
+            padding: 2px;
         }
 
         #container {
@@ -41,50 +41,46 @@
         }
 
         #config {
-            display:inline-block;
-            width:60%;
-            margin-bottom:100px;
+            display: inline-block;
+            width: 60%;
+            margin-bottom: 100px;
         }
 
         #history {
-            display:inline-block;
-            width:40%;
+            display: inline-block;
+            width: 40%;
         }
 
         #config ul li {
-            line-height:2.2em;
+            line-height: 2.2em;
         }
 
-        #config ul li>label {
-            display:inline-block;
-            width:200px;
-        }
+            #config ul li > label {
+                display: inline-block;
+                width: 200px;
+            }
 
-        #config ul li .info {
-            color:#666;
-            font-size:0.8em;
-            line-height:1.0em;
-            margin-bottom:0.4em;
-        }
+            #config ul li .info {
+                color: #666;
+                font-size: 0.8em;
+                line-height: 1.0em;
+                margin-bottom: 0.4em;
+            }
 
-        #config ul li .info em {
-            font-size:100%;
-        }
+                #config ul li .info em {
+                    font-size: 100%;
+                }
 
-        #config ul li input[type="number"] {
-            width:60px;
-        }
+            #config ul li input[type="number"], #config ul li input[type="color"] {
+                width: 60px;
+            }
 
-        #config ul li input[type="color"]{
-            width:60px;
-        }
+            #config ul li input[type="text"] {
+                width: 350px;
+            }
 
-        #config ul li input[type="text"] {
-            width:350px;
-        }
-
-        #config input[readonly]{
-            background-color:#eee;
+        #config input[readonly] {
+            background-color: #eee;
         }
 
         label.switch {
@@ -93,7 +89,7 @@
             height: 1em !important;
             width: 2.7em !important;
             cursor: pointer;
-            vertical-align:middle;
+            vertical-align: middle;
         }
 
             label.switch input[type="checkbox"] {
@@ -133,10 +129,9 @@
                     left: 50%;
                 }
 
-
-                .input-small {
-                    width:150px !important;
-                }
+        .input-small {
+            width: 150px !important;
+        }
     </style>
 </head>
 <body>
@@ -221,12 +216,7 @@
         <div id="history">
 
         </div>
-
-
     </div>
-
-
-
 
     <script>
 
@@ -274,7 +264,6 @@
         /*************/
         /*  GLOBALS  */
         /*************/
-
 
         var colors = {
             "dust": "#b2996e",
@@ -566,7 +555,6 @@
         /* WEBSOCKET */
         /*************/
 
-
         function Connect() {
 
             var ws = new WebSocket('wss://irc-ws.chat.twitch.tv');
@@ -647,13 +635,12 @@
 
 
 
-
-
         /*************/
         /*   INIT    */
         /*************/
 
         (function () {
+            canvas = document.getElementById('cv');
 
             //bind UI update events
             txtCanvasX.oninput = UpdateSettingsTrigger;
@@ -668,7 +655,6 @@
             txtChannels.oninput = UpdateSettingsTrigger;
             txtName.oninput = UpdateSettingsTrigger;
 
-
             //create queryList array
             if (window.location.search) {
                 var query = window.location.search;
@@ -680,10 +666,8 @@
                 }
             }
 
-            canvas = document.getElementById('cv');
 
-
-
+            //load if possible
             if (queryList["config"]) {
                 if (localStorage.getItem(queryList["config"]) != null) {
                     LoadSettings(queryList["config"]);
@@ -691,7 +675,6 @@
                 else {
                     //config specified, but doesn't exist
                     if (queryList["seed"]) {
-
                         config = JSON.parse(atob(queryList["seed"]));
                         SaveSettings();
                         LoadSettings('pbn-' + config.Name);
@@ -700,9 +683,6 @@
                         //specified config doesn't exist, no seed, init defaults
                         UpdateSettings();
                     }
-
-
-
                 }
             }
             else {
@@ -718,17 +698,16 @@
                 }
             }
 
-
-
             if (config.TwitchChannels.length > 0) {
                 Connect();
             }
-
-
-
-
         })();
 
+
+
+        /***************/
+        /* SAVE & LOAD */
+        /***************/
 
         function UpdateSettingsTrigger() {
             if (!isLoading) {
@@ -766,7 +745,6 @@
         }
 
         function SaveSettings() {
-
             localStorage.setItem('pbn-' + config.Name, JSON.stringify(config));
             if (debug)
                 console.log('settings saved');
@@ -804,6 +782,11 @@
         }
 
 
+
+        /*************/
+        /*  DRAWING  */
+        /*************/
+
         function DrawGrid() {
             var gridDimX, gridDimY;
 
@@ -813,7 +796,6 @@
 
                 gridDimY = Math.floor((config.CanvasHeight + 1) / (config.GridSize+1));
                 effectiveHeight = (gridDimY * (config.GridSize + 1)) - 1;
-
             }
             else { //underlap and no grid at all have the same grid size calculation
                 gridDimX = Math.floor(config.CanvasWidth / config.GridSize);
@@ -821,7 +803,6 @@
 
                 gridDimY = Math.floor(config.CanvasHeight / config.GridSize);
                 effectiveHeight = gridDimY * config.GridSize;
-
             }
 
             canvas.width = effectiveWidth;
@@ -862,7 +843,6 @@
                         ctx.moveTo((x * config.GridEmphasisFrequency * gridDrawSize) - 0.5, 0);
                         ctx.lineTo((x * config.GridEmphasisFrequency* gridDrawSize) - 0.5, canvas.height);
                         ctx.stroke();
-
                     }
 
                     for (var y = 1; y < (gridDimY / config.GridEmphasisFrequency); y++) {
@@ -870,7 +850,6 @@
                         ctx.moveTo(0, (y * config.GridEmphasisFrequency * gridDrawSize) - 0.5);
                         ctx.lineTo(canvas.width, (y * config.GridEmphasisFrequency *gridDrawSize) - 0.5);
                         ctx.stroke();
-
                     }
                 }
             }
@@ -881,6 +860,7 @@
         }
 
 
+        //imageData drawing of a square, TODO: test if faster than ctx.fillRect()
         function DrawPoint(x, y, c) {
             for (var x2 = 0; x2 < config.GridSize; x2++) {
                 for (var y2 = 0; y2 < config.GridSize; y2++) {
@@ -896,7 +876,6 @@
                 }
             }
         }
-
 
     </script>
 </body>
