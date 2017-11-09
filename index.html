@@ -35,6 +35,10 @@
             padding: 2px;
         }
 
+        input[readonly] {
+            background-color: #eee;
+        }
+
         #container {
             width: 960px;
             margin: 0 auto;
@@ -46,10 +50,7 @@
             margin-bottom: 100px;
         }
 
-        #history {
-            display: inline-block;
-            width: 40%;
-        }
+
 
         #config ul li {
             line-height: 2.2em;
@@ -79,8 +80,30 @@
                 width: 350px;
             }
 
-        #config input[readonly] {
-            background-color: #eee;
+
+
+        #history-container {
+            display: inline-block;
+            width: 39%;
+            vertical-align:top;
+        }
+
+        #history-container label {
+            display:inline-block;
+            width:80px;
+        }
+
+        #history-container input[type="text"]{
+            width:290px;
+        }
+
+        #history {
+
+        }
+
+        #history p {
+            font-size:0.9em;
+            margin-top:0.4em;
         }
 
         label.switch {
@@ -163,8 +186,8 @@
             <ul>
                 <li>
                     <label>Canvas size:</label>
-                    X: <input type="number" value="1280" id="txtCanvasX" />
-                    Y: <input type="number" value="720" id="txtCanvasY" />
+                    X: <input type="number" value="1280" id="txtCanvasX" min="1" max="3840" />
+                    Y: <input type="number" value="720" id="txtCanvasY" min="1" max="2160" />
                 </li>
                 <li>
                     <label>Grid lines enabled:</label>
@@ -175,7 +198,7 @@
                 </li>
                 <li>
                     <label>Grid size/color:</label>
-                    <input type="number" value="4" id="txtGridSize" />
+                    <input type="number" value="4" id="txtGridSize" min="1" max="100" />
                     <input type="color" value="#b0b0b0" id="colGridColor" />
                 </li>
                 <li>
@@ -232,8 +255,9 @@
             </ul>
         </div>
 
-        <div id="history">
-
+        <div id="history-container">
+            <p><label>Chat:</label><input type="text" id="txtChat" /></p>
+            <div id="history"></div>
         </div>
     </div>
 
@@ -269,6 +293,15 @@
 
         }
 
+        function componentToHex(c) {
+            var hex = c.toString(16);
+            return hex.length == 1 ? "0" + hex : hex;
+        }
+
+        function rgbToHex(r, g, b) {
+            return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+        }
+
         function Create2DArray(rows) {
             var arr = [];
             for (var i = 0; i < rows; i++)
@@ -277,7 +310,6 @@
         }
 
         //#endregion
-
 
 
         //#region global vars
@@ -581,9 +613,8 @@
                     console.log('Websocket opening: ', e);
                 this.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
                 this.send('NICK justinfan' + Math.floor(Math.random() * 999999));
-                var channels = queryList["channel"].split(',');
-                for (var i = 0; i < channels.length; i++) {
-                    this.send('JOIN #' + channels[i]);
+                for (var i = 0; i < config.TwitchChannels.length; i++) {
+                    this.send('JOIN #' + config.TwitchChannels[i]);
                 }
             }
 
@@ -593,6 +624,17 @@
                     console.log(data.data);
 
                 if (data.data.indexOf('PRIVMSG') > -1) {
+                    var parts = data.data.split('PRIVMSG');
+                    var preparts = parts[0].split(';');
+                    var user = preparts[preparts.length - 1].split(':')[1].split('!')[0];
+
+                    var cIdx = parts[1].indexOf(':');
+                    var msg = parts[1].substring(cIdx+1);
+
+
+                    ParseMessage(user, msg);
+
+                    /*
                     var o = GetChatObject(data.data);
 
                     var userParts = o["user-type"].split(':');
@@ -600,7 +642,7 @@
                     userParts.shift();
                     userParts.shift();
                     var ircMsg = userParts.join(':');
-
+                    */
                     //ParseInput(ircMsg);
                 }
                 else if (data.data.indexOf('PING') == 0) {
@@ -671,6 +713,7 @@
             colEmphasisColor.onchange = UpdateSettingsTrigger;
             txtChannels.oninput = UpdateSettingsTrigger;
             txtName.oninput = UpdateSettingsTrigger;
+            txtChat.onkeydown = ManualChat;
 
             //create queryList array
             if (window.location.search) {
@@ -804,7 +847,6 @@
         //#endregion
 
 
-
         //#region drawing code
 
         function DrawGrid() {
@@ -881,7 +923,7 @@
 
 
         //imageData drawing of a square, TODO: test if faster than ctx.fillRect()
-        function DrawPoint(x, y, c) {
+        function DrawPointData(x, y, c) {
             for (var x2 = 0; x2 < config.GridSize; x2++) {
                 for (var y2 = 0; y2 < config.GridSize; y2++) {
 
@@ -895,7 +937,69 @@
                     imageData.data[index] = 255;
                 }
             }
+            ctx.putImageData(imageData, 0, 0);
         }
+
+        function DrawCell(x, y, c) {
+            ctx.fillStyle = c;
+            var gridDrawSize = config.GridSize + (config.GridUnderlap ? 0 : 1);
+            ctx.fillRect(x * gridDrawSize, y * gridDrawSize, config.GridSize, config.GridSize);
+        }
+
+
+        //#endregion
+
+
+        //#region chat input handling
+
+        function ManualChat(e) {
+            if (e.keyCode == 13) {
+                ParseMessage('manual', txtChat.value);
+                txtChat.value = '';
+            }
+        }
+
+        function ParseMessage(user, text) {
+            text = text.trim().toLowerCase();
+            var c, coords;
+
+            if (text.indexOf('rgb') == 0) {
+                var parts = text.replace('rgb(','').split(')');
+                var colParts = parts[0].split(',');
+                c = rgbToHex(parseInt(colParts[0], 10), parseInt(colParts[1], 10), parseInt(colParts[2], 10));
+                coords = parts[1];
+            }
+            else if (text.indexOf('#') == 0) {
+                var parts = text.split(' ');
+                if (parts[0].length == 7)
+                    c = parts[0];
+                else if (parts[0].length == 4)
+                    c = '#' + parts[0].substring(1, 2) + parts[0].substring(1, 2) + parts[0].substring(2, 3) + parts[0].substring(2, 3) + parts[0].substring(3, 4) + parts[0].substring(3, 4);
+                coords = parts[1];
+
+            }
+            else {
+                var parts = text.split(' ');
+                if (colors[parts[0]] != undefined) {
+                    c = colors[parts[0]];
+                    coords = parts[1];
+                }
+            }
+
+            if (c != undefined) {
+                var coordParts = coords.split(',');
+
+                if (coordParts.length == 2) {
+                    DrawCell(parseInt(coordParts[0], 10) - 1, parseInt(coordParts[1], 10) - 1, c);
+
+                    var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
+                    document.getElementById('history').insertAdjacentHTML('afterbegin', str);
+                }
+            }
+
+
+        }
+
 
         //#endregion
 
