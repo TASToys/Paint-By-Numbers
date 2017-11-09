@@ -750,7 +750,10 @@
                 }
             }
             else {
-                if (queryList["seed"]) {
+                if (localStorage.getItem('pbn-default') != null) {
+                    LoadSettings('pbn-default');
+                }
+                else if (queryList["seed"]) {
                     //no config, seed, load from seed
                     config = JSON.parse(atob(queryList["seed"]));
                     SaveSettings();
