@@ -132,6 +132,25 @@
         .input-small {
             width: 150px !important;
         }
+
+
+
+        body.obs #cv-container {
+            text-align:left;
+        }
+
+        body.obs #cv {
+            border:0;
+        }
+
+        body.obs h1 {
+            display:none;
+        }
+
+        body.obs #container {
+            display:none;
+        }
+
     </style>
 </head>
 <body>
@@ -640,6 +659,7 @@
         /*************/
 
         (function () {
+
             canvas = document.getElementById('cv');
 
             //bind UI update events
@@ -664,6 +684,10 @@
                     queryList[parts[0].trim()] = parts[1].trim();
 
                 }
+            }
+
+            if (window.obsstudio || queryList["mode"]=="obs") {
+                document.getElementsByTagName('body')[0].classList.add('obs');
             }
 
 
