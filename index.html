@@ -239,9 +239,7 @@
 
     <script>
 
-        /*************/
-        /* UTILITIES */
-        /*************/
+        //#region utility functions
 
         function Color(r, g, b) {
             this.R = r;
@@ -278,11 +276,11 @@
             return arr;
         }
 
+        //#endregion
 
 
-        /*************/
-        /*  GLOBALS  */
-        /*************/
+
+        //#region global vars
 
         var colors = {
             "dust": "#b2996e",
@@ -569,10 +567,10 @@
             Name: 'default'
         };
 
+        //#endregion
 
-        /*************/
-        /* WEBSOCKET */
-        /*************/
+
+        //#region websocket
 
         function Connect() {
 
@@ -652,11 +650,10 @@
             return ret;
         }
 
+        //#endregion
 
 
-        /*************/
-        /*   INIT    */
-        /*************/
+        //#region init
 
         (function () {
 
@@ -727,11 +724,10 @@
             }
         })();
 
+        //#endregion
 
 
-        /***************/
-        /* SAVE & LOAD */
-        /***************/
+        //#region save & load stuff
 
         function UpdateSettingsTrigger() {
             if (!isLoading) {
@@ -805,11 +801,11 @@
             txtSeedURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name + '&seed=' + btoa(JSON.stringify(config));
         }
 
+        //#endregion
 
 
-        /*************/
-        /*  DRAWING  */
-        /*************/
+
+        //#region drawing code
 
         function DrawGrid() {
             var gridDimX, gridDimY;
@@ -900,6 +896,8 @@
                 }
             }
         }
+
+        //#endregion
 
     </script>
 </body>
