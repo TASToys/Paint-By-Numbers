@@ -918,6 +918,7 @@
                     }
                 }
             }
+            imageData = ctx.createImageData(canvas.width, canvas.height);
 
             //ctx.fillStyle='color';
             //ctx.fillRect(x,y,w,h);
@@ -926,7 +927,7 @@
 
 
         //imageData drawing of a square, TODO: test if faster than ctx.fillRect()
-        function DrawPointData(x, y, c) {
+        function DrawCellData(x, y, c) {
             for (var x2 = 0; x2 < config.GridSize; x2++) {
                 for (var y2 = 0; y2 < config.GridSize; y2++) {
 
