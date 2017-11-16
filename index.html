@@ -82,26 +82,26 @@
 
 
 
-        #history-container {
+        #sceneHistory-container {
             display: inline-block;
             width: 39%;
             vertical-align:top;
         }
 
-        #history-container label {
+        #sceneHistory-container label {
             display:inline-block;
             width:80px;
         }
 
-        #history-container input[type="text"]{
+        #sceneHistory-container input[type="text"]{
             width:290px;
         }
 
-        #history {
+        #sceneHistory {
 
         }
 
-        #history p {
+        #sceneHistory p {
             font-size:0.9em;
             margin-top:0.4em;
         }
@@ -255,9 +255,9 @@
             </ul>
         </div>
 
-        <div id="history-container">
+        <div id="sceneHistory-container">
             <p><label>Chat:</label><input type="text" id="txtChat" /></p>
-            <div id="history"></div>
+            <div id="sceneHistory"></div>
         </div>
     </div>
 
@@ -307,6 +307,20 @@
             for (var i = 0; i < rows; i++)
                 arr[i] = [];
             return arr;
+        }
+
+        function PaintEvent() {
+            this.X = 0;
+            this.Y = 0;
+            this.User = '';
+            this.Timestamp = 0;
+            this.Color = '';
+        }
+
+        function CellState() {
+            this.User = '';
+            this.Timestamp = 0;
+            this.Color = '';
         }
 
         //#endregion
@@ -578,10 +592,11 @@
             effectiveHeight = 0, //actual canvas dimensions calculated from grid settings
 
             settingsTimerId = -1, //timer variable for UI delay on update
-            isLoading=false, //switch to ignore input change events while loading
+            isLoading = false, //switch to ignore input change events while loading
 
             queryList = {}, //name-indexed list of query string parameters
-            history = [], //history of draw orders given
+            sceneHistory = [], //history of draw orders given
+            state = [], //current state of the image
 
             debug = true; //switch to log detailed info to console
 
@@ -673,8 +688,10 @@
         mod=1;
         room-id=70067886;
         sent-ts=1509252055763;
-        subscriber=1;tmi-sent-ts=1509252067701;
-        turbo=0;user-id=111485954;
+        subscriber=1;
+        tmi-sent-ts=1509252067701;
+        turbo=0;
+        user-id=111485954;
         user-type=mod:mediamagnet!mediamagnet@mediamagnet.tmi.twitch.tv PRIVMSG #dwangoac :oh nice
 */
 
@@ -824,6 +841,7 @@
             if (debug)
                 console.log(config);
 
+
             txtCanvasX.value = config.CanvasWidth;
             txtCanvasY.value = config.CanvasHeight;
             cbShowGrid.checked = config.GridEnabled;
@@ -840,6 +858,22 @@
 
             isLoading = false;
             DrawGrid();
+
+            if (localStorage.getItem(configName + '-history') != null)
+                sceneHistory = JSON.parse(localStorage.getItem(configName + '-history'));
+            if (localStorage.getItem(configName + '-state') != null) {
+                state = JSON.parse(localStorage.getItem(configName + '-state'));
+
+                for (var x = 0; x < state.length; x++) {
+                    for (var y = 0; y < state[0].length; y++) {
+                        if (state[x][y].User != 'start') {
+                            DrawCell(x, y, state[x][y].Color);
+                        }
+                    }
+                }
+
+            }
+
         }
 
         function UpdateURLs() {
@@ -868,6 +902,17 @@
 
                 gridDimY = Math.floor(config.CanvasHeight / config.GridSize);
                 effectiveHeight = gridDimY * config.GridSize;
+            }
+
+            state = Create2DArray(gridDimX);
+            for (var x = 0; x < gridDimX; x++) {
+                for (var y = 0; y < gridDimY; y++) {
+                    var s = new CellState();
+                    s.User = 'start';
+                    s.Color = '#ffffff';
+                    s.Timestamp = new Date();
+                    state[x][y] = s;
+                }
             }
 
             canvas.width = effectiveWidth;
@@ -997,7 +1042,25 @@
                     DrawCell(parseInt(coordParts[0], 10) - 1, parseInt(coordParts[1], 10) - 1, c);
 
                     var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
-                    document.getElementById('history').insertAdjacentHTML('afterbegin', str);
+                    document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
+
+                    
+
+                    var h = new PaintEvent();
+                    h.X = parseInt(coordParts[0], 10) - 1;
+                    h.Y = parseInt(coordParts[1], 10) - 1;
+                    h.Color = c;
+                    h.User = user;
+                    h.Timestamp = new Date();
+                    sceneHistory.push(h);
+                    localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
+
+
+                    state[h.X][h.Y].User = h.User;
+                    state[h.X][h.Y].Timestamp = h.Timestamp;
+                    state[h.X][h.Y].Color = h.Color;
+
+                    localStorage.setItem('pbn-' + config.Name + '-state', JSON.stringify(state));
                 }
             }
 
