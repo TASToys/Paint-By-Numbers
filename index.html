@@ -52,59 +52,58 @@
 
 
 
-        #config ul li {
-            line-height: 2.2em;
-        }
-
-            #config ul li > label {
-                display: inline-block;
-                width: 200px;
+            #config ul li {
+                line-height: 2.2em;
             }
 
-            #config ul li .info {
-                color: #666;
-                font-size: 0.8em;
-                line-height: 1.0em;
-                margin-bottom: 0.4em;
-            }
-
-                #config ul li .info em {
-                    font-size: 100%;
+                #config ul li > label {
+                    display: inline-block;
+                    width: 200px;
                 }
 
-            #config ul li input[type="number"], #config ul li input[type="color"] {
-                width: 60px;
-            }
+                #config ul li .info {
+                    color: #666;
+                    font-size: 0.8em;
+                    line-height: 1.0em;
+                    margin-bottom: 0.4em;
+                }
 
-            #config ul li input[type="text"] {
-                width: 350px;
-            }
+                    #config ul li .info em {
+                        font-size: 100%;
+                    }
+
+                #config ul li input[type="number"], #config ul li input[type="color"] {
+                    width: 60px;
+                }
+
+                #config ul li input[type="text"] {
+                    width: 350px;
+                }
 
 
 
         #sceneHistory-container {
             display: inline-block;
             width: 39%;
-            vertical-align:top;
+            vertical-align: top;
         }
 
-        #sceneHistory-container label {
-            display:inline-block;
-            width:80px;
-        }
+            #sceneHistory-container label {
+                display: inline-block;
+                width: 80px;
+            }
 
-        #sceneHistory-container input[type="text"]{
-            width:290px;
-        }
+            #sceneHistory-container input[type="text"] {
+                width: 290px;
+            }
 
         #sceneHistory {
-
         }
 
-        #sceneHistory p {
-            font-size:0.9em;
-            margin-top:0.4em;
-        }
+            #sceneHistory p {
+                font-size: 0.9em;
+                margin-top: 0.4em;
+            }
 
         label.switch {
             font-size: 22px;
@@ -159,21 +158,20 @@
 
 
         body.obs #cv-container {
-            text-align:left;
+            text-align: left;
         }
 
         body.obs #cv {
-            border:0;
+            border: 0;
         }
 
         body.obs h1 {
-            display:none;
+            display: none;
         }
 
         body.obs #container {
-            display:none;
+            display: none;
         }
-
     </style>
 </head>
 <body>
@@ -321,6 +319,13 @@
             this.User = '';
             this.Timestamp = 0;
             this.Color = '';
+        }
+
+        function AnimationFrame() {
+            this.EmoteID = -1;
+            this.Countdown = 0;
+            this.Duration = 30;
+            this.DrawOrders = [];
         }
 
         //#endregion
@@ -594,9 +599,16 @@
             settingsTimerId = -1, //timer variable for UI delay on update
             isLoading = false, //switch to ignore input change events while loading
 
+            animationTimerId = -1,
+
             queryList = {}, //name-indexed list of query string parameters
             sceneHistory = [], //history of draw orders given
             state = [], //current state of the image
+            lastState = [],
+
+            emotes = [], //array of already-loaded emotes
+
+            pendingAnimations = [],
 
             debug = true; //switch to log detailed info to console
 
@@ -619,15 +631,22 @@
 
         //#region websocket
 
+        var ws;
+
         function Connect() {
 
-            var ws = new WebSocket('wss://irc-ws.chat.twitch.tv');
+            ws = new WebSocket('wss://irc-ws.chat.twitch.tv');
 
             ws.onopen = function open(e) {
                 if (debug)
                     console.log('Websocket opening: ', e);
-                this.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
-                this.send('NICK justinfan' + Math.floor(Math.random() * 999999));
+                //this.send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
+                this.send('CAP REQ :twitch.tv/commands');
+                //this.send('NICK justinfan' + Math.floor(Math.random() * 999999));
+
+                this.send('PASS oauth:egzail7my7px5i2gn47qpgb8nx49ug');
+                this.send('NICK botshifter08');
+                this.send('JOIN #199.9.253.119');
                 for (var i = 0; i < config.TwitchChannels.length; i++) {
                     this.send('JOIN #' + config.TwitchChannels[i]);
                 }
@@ -644,12 +663,14 @@
                     var user = preparts[preparts.length - 1].split(':')[1].split('!')[0];
 
                     var cIdx = parts[1].indexOf(':');
-                    var msg = parts[1].substring(cIdx+1);
+                    var msg = parts[1].substring(cIdx + 1);
 
 
                     ParseMessage(user, msg);
 
                     /*
+                    https://static-cdn.jtvnw.net/emoticons/v1/{idx}/1.0
+
                     var o = GetChatObject(data.data);
 
                     var userParts = o["user-type"].split(':');
@@ -679,21 +700,21 @@
             }
         }
 
-/*
-        @badges=moderator/1,subscriber/0,bits/5000;
-        color=#FF4500;
-        display-name=MediaMagnet;
-        emotes=;
-        id=98a76159-e2f6-4080-bb5e-910cd54a6467;
-        mod=1;
-        room-id=70067886;
-        sent-ts=1509252055763;
-        subscriber=1;
-        tmi-sent-ts=1509252067701;
-        turbo=0;
-        user-id=111485954;
-        user-type=mod:mediamagnet!mediamagnet@mediamagnet.tmi.twitch.tv PRIVMSG #dwangoac :oh nice
-*/
+        /*
+                @badges=moderator/1,subscriber/0,bits/5000;
+                color=#FF4500;
+                display-name=MediaMagnet;
+                emotes=;
+                id=98a76159-e2f6-4080-bb5e-910cd54a6467;
+                mod=1;
+                room-id=70067886;
+                sent-ts=1509252055763;
+                subscriber=1;
+                tmi-sent-ts=1509252067701;
+                turbo=0;
+                user-id=111485954;
+                user-type=mod:mediamagnet!mediamagnet@mediamagnet.tmi.twitch.tv PRIVMSG #dwangoac :oh nice
+        */
 
         function GetChatObject(str) {
             var ret = {};
@@ -743,7 +764,7 @@
                 }
             }
 
-            if (window.obsstudio || queryList["mode"]=="obs") {
+            if (window.obsstudio || queryList["mode"] == "obs") {
                 document.getElementsByTagName('body')[0].classList.add('obs');
             }
 
@@ -785,6 +806,8 @@
             if (config.TwitchChannels.length > 0) {
                 Connect();
             }
+
+            animationTimerId = setInterval(AnimationTick, 100);
         })();
 
         //#endregion
@@ -800,7 +823,7 @@
         }
 
         function UpdateSettings() {
-            
+
             config.CanvasWidth = parseInt(txtCanvasX.value, 10);
             config.CanvasHeight = parseInt(txtCanvasY.value, 10);
             config.GridEnabled = cbShowGrid.checked;
@@ -863,6 +886,7 @@
                 sceneHistory = JSON.parse(localStorage.getItem(configName + '-history'));
             if (localStorage.getItem(configName + '-state') != null) {
                 state = JSON.parse(localStorage.getItem(configName + '-state'));
+                lastState = JSON.parse(localStorage.getItem(configName + '-state'));
 
                 for (var x = 0; x < state.length; x++) {
                     for (var y = 0; y < state[0].length; y++) {
@@ -890,10 +914,10 @@
             var gridDimX, gridDimY;
 
             if (config.GridEnabled && !config.GridUnderlap) {
-                gridDimX = Math.floor((config.CanvasWidth + 1) / (config.GridSize+1));
+                gridDimX = Math.floor((config.CanvasWidth + 1) / (config.GridSize + 1));
                 effectiveWidth = (gridDimX * (config.GridSize + 1)) - 1;
 
-                gridDimY = Math.floor((config.CanvasHeight + 1) / (config.GridSize+1));
+                gridDimY = Math.floor((config.CanvasHeight + 1) / (config.GridSize + 1));
                 effectiveHeight = (gridDimY * (config.GridSize + 1)) - 1;
             }
             else { //underlap and no grid at all have the same grid size calculation
@@ -905,6 +929,7 @@
             }
 
             state = Create2DArray(gridDimX);
+            lastState = Create2DArray(gridDimX);
             for (var x = 0; x < gridDimX; x++) {
                 for (var y = 0; y < gridDimY; y++) {
                     var s = new CellState();
@@ -912,6 +937,7 @@
                     s.Color = '#ffffff';
                     s.Timestamp = new Date();
                     state[x][y] = s;
+                    lastState[x][y] = s;
                 }
             }
 
@@ -934,8 +960,8 @@
 
                 for (var x = 1; x < gridDimX; x++) {
                     ctx.beginPath();
-                    ctx.moveTo((x * gridDrawSize)-0.5, 0);
-                    ctx.lineTo((x * gridDrawSize)-0.5, canvas.height);
+                    ctx.moveTo((x * gridDrawSize) - 0.5, 0);
+                    ctx.lineTo((x * gridDrawSize) - 0.5, canvas.height);
                     ctx.stroke();
                 }
                 for (var y = 1; y < gridDimY; y++) {
@@ -951,43 +977,20 @@
                     for (var x = 1; x < (gridDimX / config.GridEmphasisFrequency); x++) {
                         ctx.beginPath();
                         ctx.moveTo((x * config.GridEmphasisFrequency * gridDrawSize) - 0.5, 0);
-                        ctx.lineTo((x * config.GridEmphasisFrequency* gridDrawSize) - 0.5, canvas.height);
+                        ctx.lineTo((x * config.GridEmphasisFrequency * gridDrawSize) - 0.5, canvas.height);
                         ctx.stroke();
                     }
 
                     for (var y = 1; y < (gridDimY / config.GridEmphasisFrequency); y++) {
                         ctx.beginPath();
                         ctx.moveTo(0, (y * config.GridEmphasisFrequency * gridDrawSize) - 0.5);
-                        ctx.lineTo(canvas.width, (y * config.GridEmphasisFrequency *gridDrawSize) - 0.5);
+                        ctx.lineTo(canvas.width, (y * config.GridEmphasisFrequency * gridDrawSize) - 0.5);
                         ctx.stroke();
                     }
                 }
             }
-            imageData = ctx.createImageData(canvas.width, canvas.height);
-
-            //ctx.fillStyle='color';
-            //ctx.fillRect(x,y,w,h);
-
         }
 
-
-        //imageData drawing of a square, TODO: test if faster than ctx.fillRect()
-        function DrawCellData(x, y, c) {
-            for (var x2 = 0; x2 < config.GridSize; x2++) {
-                for (var y2 = 0; y2 < config.GridSize; y2++) {
-
-                    var index =
-                        (((x * config.GridSize) + x2) +
-                            ((y * config.GridSize) + y2) *
-                            canvas.width) * 4;
-                    imageData.data[index++] = c.R;
-                    imageData.data[index++] = c.G;
-                    imageData.data[index++] = c.B;
-                    imageData.data[index] = 255;
-                }
-            }
-            ctx.putImageData(imageData, 0, 0);
-        }
 
         function DrawCell(x, y, c) {
             ctx.fillStyle = c;
@@ -1013,7 +1016,7 @@
             var c, coords;
 
             if (text.indexOf('rgb') == 0) {
-                var parts = text.replace('rgb(','').split(')');
+                var parts = text.replace('rgb(', '').split(')');
                 var colParts = parts[0].split(',');
                 c = rgbToHex(parseInt(colParts[0], 10), parseInt(colParts[1], 10), parseInt(colParts[2], 10));
                 coords = parts[1];
@@ -1035,6 +1038,33 @@
                 }
             }
 
+            if (user == 'manual') {
+                if (text.indexOf('emote') == 0) {
+                    var parts = text.split(' ');
+                    var idx = parseInt(parts[1], 10);
+                    if (emotes[idx] == null) {
+                        var i = new Image();
+                        i.onload = OnEmoteLoaded;
+                        i.crossOrigin = 'anonymous';
+                        i.src = 'https://static-cdn.jtvnw.net/emoticons/v1/' + parts[1] + '/1.0';
+                        emotes[parseInt(parts[1], 10)] = {};
+                        emotes[parseInt(parts[1], 10)].img = i;
+                        emotes[parseInt(parts[1], 10)].canvas = document.createElement('canvas');
+                    }
+                    else {
+                        CreateAnimation(idx);
+                    }
+
+
+
+
+
+
+
+                }
+
+            }
+
             if (c != undefined) {
                 var coordParts = coords.split(',');
 
@@ -1044,7 +1074,7 @@
                     var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
                     document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
 
-                    
+
 
                     var h = new PaintEvent();
                     h.X = parseInt(coordParts[0], 10) - 1;
@@ -1055,6 +1085,9 @@
                     sceneHistory.push(h);
                     localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
 
+                    lastState[h.X][h.Y].User = state[h.X][h.Y].User;
+                    lastState[h.X][h.Y].Timestamp = state[h.X][h.Y].Timestamp;
+                    lastState[h.X][h.Y].Color = state[h.X][h.Y].Color;
 
                     state[h.X][h.Y].User = h.User;
                     state[h.X][h.Y].Timestamp = h.Timestamp;
@@ -1069,6 +1102,79 @@
 
 
         //#endregion
+
+
+
+        function OnEmoteLoaded(e) {
+            var parts = e.path[0].src.split('/');
+            var idx = parseInt(parts[5], 10);
+            emotes[idx].canvas.width = emotes[idx].img.width;
+            emotes[idx].canvas.height = emotes[idx].img.height;
+            emotes[idx].canvas.src = emotes[idx].img;
+            emotes[idx].ctx = emotes[idx].canvas.getContext('2d');
+            emotes[idx].ctx.drawImage(emotes[idx].img, 0, 0);
+            emotes[idx].data = emotes[idx].ctx.getImageData(0, 0, emotes[idx].canvas.width, emotes[idx].canvas.height);
+            CreateAnimation(idx);
+        }
+
+        function CreateAnimation(emoteIdx) {
+            var origin = new Point(0, 0);
+
+            for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
+                var anim = new AnimationFrame();
+                anim.Countdown = x;
+                anim.Duration = 30;
+
+                for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
+                    if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
+                        var h = new PaintEvent();
+                        h.X = origin.X + x;
+                        h.Y = origin.Y + y;
+                        h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
+                        anim.DrawOrders.push(h);
+                    }
+                }
+
+                pendingAnimations.push(anim);
+            }
+        }
+
+        function IsPixelOpaque(data, x, y) {
+            var idx = (data.width * y + x) * 4;
+            return data.data[idx + 3] == 255;
+        }
+
+        function GetPixelFromImageData(data, x, y) {
+            var idx = (data.width * y + x) * 4;
+            return rgbToHex(data.data[idx], data.data[idx + 1], data.data[idx + 2]);
+        }
+
+        function AnimationTick() {
+            var removeList = [];
+            for (var i = 0; i < pendingAnimations.length; i++) {
+
+                if (pendingAnimations[i].Countdown == 0) { //draw anim frame
+                    pendingAnimations[i].DrawOrders.forEach(function (x) {
+                        DrawCell(x.X, x.Y, x.Color);
+                    });
+
+                }
+                else if (Math.abs(pendingAnimations[i].Countdown) == pendingAnimations[i].Duration) { //undraw
+                    pendingAnimations[i].DrawOrders.forEach(function (x) {
+                        DrawCell(x.X, x.Y, state[x.X][x.Y].Color);
+                    });
+                    removeList.push(i);
+                }
+
+                pendingAnimations[i].Countdown--;
+                
+            }
+
+            for (var i = removeList.length - 1; i >= 0; i--) {
+                pendingAnimations.splice(i, 1);
+            }
+        }
+
 
     </script>
 </body>
