@@ -1106,7 +1106,15 @@
 
 
         function OnEmoteLoaded(e) {
-            var parts = e.path[0].src.split('/');
+            console.log(e);
+            var parts;
+            if (e.path) {
+                parts = e.path[0].src.split('/');
+            }
+            else {
+                parts = e.target.src.split('/');
+            }
+
             var idx = parseInt(parts[5], 10);
             emotes[idx].canvas.width = emotes[idx].img.width;
             emotes[idx].canvas.height = emotes[idx].img.height;
