@@ -307,13 +307,17 @@
             return arr;
         }
 
+        function RandomInt(min, max) {
+            return min + Math.floor(Math.random() * (max - min));
+        }
+
         function PaintEvent() {
             this.X = 0;
             this.Y = 0;
             this.User = '';
             this.Timestamp = 0;
             this.Color = '';
-        }
+        } 
 
         function CellState() {
             this.User = '';
@@ -1123,31 +1127,86 @@
             emotes[idx].ctx = emotes[idx].canvas.getContext('2d');
             emotes[idx].ctx.drawImage(emotes[idx].img, 0, 0);
             emotes[idx].data = emotes[idx].ctx.getImageData(0, 0, emotes[idx].canvas.width, emotes[idx].canvas.height);
+            emotes[idx].Points = [];
+
+            for (var x = 0; x < emotes[idx].img.width; x++) {
+                for (var y = 0; y < emotes[idx].img.height; y++) {
+                    if (IsPixelOpaque(emotes[idx].data, x, y)) {
+                        var o = {
+                            X: x,
+                            Y: y,
+                            Color: GetPixelFromImageData(emotes[idx].data, x, y)
+                        };
+                        emotes[idx].Points.push(o);
+                    }
+                }
+            }
+
+
             CreateAnimation(idx);
         }
 
+        var animations = [
+            function (origin, emoteIdx) {
+                for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
+                    var anim = new AnimationFrame();
+                    anim.Countdown = x * 3;
+                    anim.Duration = 120;
 
+                    for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
+                        if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
+                            var h = new PaintEvent();
+                            h.X = origin.X + x;
+                            h.Y = origin.Y + y;
+                            h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
+                            anim.DrawOrders.push(h);
+                        }
+                    }
 
-        function CreateAnimation(emoteIdx) {
-            var origin = new Point(0, 0);
+                    pendingAnimations.push(anim);
+                }
+            },
+            function (origin, emoteIdx) {
+                var drawPts = [];
 
-            for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
-                var anim = new AnimationFrame();
-                anim.Countdown = x*3;
-                anim.Duration = 120;
-
-                for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
-                    if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
-                        var h = new PaintEvent();
-                        h.X = origin.X + x;
-                        h.Y = origin.Y + y;
-                        h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
-                        anim.DrawOrders.push(h);
+                for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
+                    for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
+                        if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
+                            drawPts.push(new Point(x, y));
+                        }
                     }
                 }
 
-                pendingAnimations.push(anim);
+                var frameCounter = 0;
+
+                while (drawPts.length > 0) {
+                    var idx = RandomInt(0, drawPts.length);
+
+                    var anim = new AnimationFrame();
+                    anim.Countdown = Math.floor(frameCounter/5);
+                    anim.Duration = 120;
+
+                    var h = new PaintEvent();
+                    h.X = drawPts[idx].X;
+                    h.Y = drawPts[idx].Y;
+                    h.Color = GetPixelFromImageData(emotes[emoteIdx].data, h.X, h.Y);
+                    anim.DrawOrders.push(h);
+
+                    pendingAnimations.push(anim);
+
+                    frameCounter++;
+                    drawPts.splice(idx, 1);
+                }
+
             }
+        ]
+
+        function CreateAnimation(emoteIdx) {
+            var origin = new Point(RandomInt(0, emotes[emoteIdx].img.width), RandomInt(0, emotes[emoteIdx].img.height)),
+                i = RandomInt(0, animations.length);
+
+            animations[i](origin, emoteIdx);
+            
         }
 
         function IsPixelOpaque(data, x, y) {
@@ -1161,6 +1220,7 @@
         }
 
         function AnimationTick() {
+            //console.log('tick');
             var removeList = [];
             for (var i = 0; i < pendingAnimations.length; i++) {
 
@@ -1170,7 +1230,7 @@
                     });
 
                 }
-                else if (Math.abs(pendingAnimations[i].Countdown) == pendingAnimations[i].Duration) { //undraw
+                else if (pendingAnimations[i].Countdown<0 && Math.abs(pendingAnimations[i].Countdown) == pendingAnimations[i].Duration) { //undraw
                     pendingAnimations[i].DrawOrders.forEach(function (pt) {
                         DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].Color);
 
