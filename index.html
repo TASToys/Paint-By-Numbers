@@ -320,9 +320,9 @@
         } 
 
         function CellState() {
-            this.User = '';
-            this.Timestamp = 0;
-            this.Color = '';
+            this.u = '';
+            this.t = 0;
+            this.c = '';
         }
 
         function AnimationFrame() {
@@ -626,6 +626,8 @@
             GridEmphasisEnabled: true,
             GridEmphasisFrequency: 10,
             GridEmphasisColor: '#808080',
+            GridWidth: 0,
+            GridHeight:0,
             TwitchChannels: [],
             Name: 'default'
         };
@@ -644,13 +646,13 @@
             ws.onopen = function open(e) {
                 if (debug)
                     console.log('Websocket opening: ', e);
-                //this.send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
-                this.send('CAP REQ :twitch.tv/commands');
-                //this.send('NICK justinfan' + Math.floor(Math.random() * 999999));
 
-                this.send('PASS oauth:egzail7my7px5i2gn47qpgb8nx49ug');
-                this.send('NICK botshifter08');
-                this.send('JOIN #199.9.253.119');
+                this.send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
+                //this.send('CAP REQ :twitch.tv/commands');
+                this.send('NICK justinfan' + Math.floor(Math.random() * 999999));
+
+
+                //this.send('JOIN #199.9.253.119');
                 for (var i = 0; i < config.TwitchChannels.length; i++) {
                     this.send('JOIN #' + config.TwitchChannels[i]);
                 }
@@ -669,8 +671,20 @@
                     var cIdx = parts[1].indexOf(':');
                     var msg = parts[1].substring(cIdx + 1);
 
+                    var hasEmote = false, emoteIdx = -1;
+                    for (var i = 0; i < preparts.length; i++) {
+                        if (preparts[i].indexOf('emotes=') == 0 && preparts[i].trim()!='emotes=') {
+                            var emoteList = preparts[i].split('=')[1].split('/');
+                            emoteIdx = parseInt(emoteList[0].split(':')[0], 10);
+                            hasEmote = true;
 
-                    ParseMessage(user, msg);
+                        }
+                    }
+
+                    if (hasEmote)
+                        ParseMessage('manual', 'emote ' + emoteIdx);
+                    else
+                        ParseMessage(user, msg);
 
                     /*
                     https://static-cdn.jtvnw.net/emoticons/v1/{idx}/1.0
@@ -705,6 +719,31 @@
         }
 
         /*
+            cheer/emote msg:
+
+        @badges=broadcaster/1;
+        color=#1E90FF;
+        display-name=timeshifter08;
+        emote-only=1;
+        emotes=25:0-4/41:6-13;
+        id=6e46ba37-29a0-4ab3-9ca2-c07451e985f8;mod=0;room-id=61927669;subscriber=0;tmi-sent-ts=1516225093401;turbo=0;user-id=61927669;user-type= :timeshifter08!timeshifter08@timeshifter08.tmi.twitch.tv PRIVMSG #timeshifter08 :Kappa Kreygasm
+
+        @badges=bits/1;
+        bits=1;
+        color=#1E90FF;
+        display-name=timeshifter08;
+        emotes=41:7-14;
+        id=c8ee75e9-197a-4d05-8741-221363eecbfc;
+        mod=0;
+        room-id=70067886;
+        subscriber=0;
+        tmi-sent-ts=1511968477261;
+        turbo=0;
+        user-id=61927669;
+        user-type=
+        :timeshifter08!timeshifter08@timeshifter08.tmi.twitch.tv PRIVMSG #dwangoac :cheer1 Kreygasm
+
+
                 @badges=moderator/1,subscriber/0,bits/5000;
                 color=#FF4500;
                 display-name=MediaMagnet;
@@ -895,8 +934,8 @@
 
                 for (var x = 0; x < state.length; x++) {
                     for (var y = 0; y < state[0].length; y++) {
-                        if (state[x][y].User != 'start') {
-                            DrawCell(x, y, state[x][y].Color);
+                        if (state[x][y].u != 'start') {
+                            DrawCell(x, y, state[x][y].c);
                         }
                     }
                 }
@@ -907,7 +946,7 @@
 
         function UpdateURLs() {
             txtQuickURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
-            txtSeedURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name + '&seed=' + btoa(JSON.stringify(config));
+            txtSeedURL.value = window.location.href.replace(window.location.search, '') + '?seed=' + btoa(JSON.stringify(config));
         }
 
         //#endregion
@@ -933,14 +972,17 @@
                 effectiveHeight = gridDimY * config.GridSize;
             }
 
+            config.GridWidth = gridDimX;
+            config.GridHeight = gridDimY;
+
             state = Create2DArray(gridDimX);
             lastState = Create2DArray(gridDimX);
             for (var x = 0; x < gridDimX; x++) {
                 for (var y = 0; y < gridDimY; y++) {
                     var s = new CellState();
-                    s.User = 'start';
-                    s.Color = '#ffffff';
-                    s.Timestamp = new Date();
+                    s.u = 'start';
+                    s.c = '#ffffff';
+                    s.t = (new Date()).getTime();
                     state[x][y] = s;
                     lastState[x][y] = s;
                 }
@@ -1032,14 +1074,16 @@
                     c = parts[0];
                 else if (parts[0].length == 4)
                     c = '#' + parts[0].substring(1, 2) + parts[0].substring(1, 2) + parts[0].substring(2, 3) + parts[0].substring(2, 3) + parts[0].substring(3, 4) + parts[0].substring(3, 4);
-                coords = parts[1];
+                parts.shift();
+                coords = parts.join('');
 
             }
             else {
                 var parts = text.split(' ');
                 if (colors[parts[0]] != undefined) {
                     c = colors[parts[0]];
-                    coords = parts[1];
+                    parts.shift();
+                    coords = parts.join('');
                 }
             }
 
@@ -1074,7 +1118,7 @@
                 var coordParts = coords.split(',');
 
                 if (coordParts.length == 2) {
-                    DrawCell(parseInt(coordParts[0], 10) - 1, parseInt(coordParts[1], 10) - 1, c);
+                    DrawCell(parseInt(coordParts[0].trim(), 10) - 1, parseInt(coordParts[1].trim(), 10) - 1, c);
 
                     var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
                     document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
@@ -1086,17 +1130,17 @@
                     h.Y = parseInt(coordParts[1], 10) - 1;
                     h.Color = c;
                     h.User = user;
-                    h.Timestamp = new Date();
+                    h.Timestamp = (new Date()).getTime();
                     sceneHistory.push(h);
                     localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
 
-                    lastState[h.X][h.Y].User = state[h.X][h.Y].User;
-                    lastState[h.X][h.Y].Timestamp = state[h.X][h.Y].Timestamp;
-                    lastState[h.X][h.Y].Color = state[h.X][h.Y].Color;
+                    lastState[h.X][h.Y].u = state[h.X][h.Y].u;
+                    lastState[h.X][h.Y].t = state[h.X][h.Y].t;
+                    lastState[h.X][h.Y].c = state[h.X][h.Y].c;
 
-                    state[h.X][h.Y].User = h.User;
-                    state[h.X][h.Y].Timestamp = h.Timestamp;
-                    state[h.X][h.Y].Color = h.Color;
+                    state[h.X][h.Y].u = h.User;
+                    state[h.X][h.Y].t = h.Timestamp;
+                    state[h.X][h.Y].c = h.Color;
 
                     localStorage.setItem('pbn-' + config.Name + '-state', JSON.stringify(state));
                 }
@@ -1111,7 +1155,7 @@
 
 
         function OnEmoteLoaded(e) {
-            console.log(e);
+           // console.log(e);
             var parts;
             if (e.path) {
                 parts = e.path[0].src.split('/');
@@ -1142,6 +1186,8 @@
                 }
             }
 
+            console.log(emotes[idx]);
+
 
             CreateAnimation(idx);
         }
@@ -1152,6 +1198,7 @@
                     var anim = new AnimationFrame();
                     anim.Countdown = x * 3;
                     anim.Duration = 120;
+                    anim.EmoteID = emoteIdx;
 
                     for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
                         if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
@@ -1159,7 +1206,8 @@
                             h.X = origin.X + x;
                             h.Y = origin.Y + y;
                             h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
-                            anim.DrawOrders.push(h);
+                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight)
+                                anim.DrawOrders.push(h);
                         }
                     }
 
@@ -1185,6 +1233,7 @@
                     var anim = new AnimationFrame();
                     anim.Countdown = Math.floor(frameCounter/5);
                     anim.Duration = 120;
+                    anim.EmoteID = emoteIdx;
 
                     var h = new PaintEvent();
                     h.X = drawPts[idx].X;
@@ -1202,11 +1251,11 @@
         ]
 
         function CreateAnimation(emoteIdx) {
-            var origin = new Point(RandomInt(0, emotes[emoteIdx].img.width), RandomInt(0, emotes[emoteIdx].img.height)),
+
+            var origin = new Point(RandomInt(0, config.GridWidth- emotes[emoteIdx].img.width-1), RandomInt(0,config.GridHeight- emotes[emoteIdx].img.height-1)),
                 i = RandomInt(0, animations.length);
 
             animations[i](origin, emoteIdx);
-            
         }
 
         function IsPixelOpaque(data, x, y) {
@@ -1232,8 +1281,14 @@
                 }
                 else if (pendingAnimations[i].Countdown<0 && Math.abs(pendingAnimations[i].Countdown) == pendingAnimations[i].Duration) { //undraw
                     pendingAnimations[i].DrawOrders.forEach(function (pt) {
-                        DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].Color);
+                        try {
+                            DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
+                        }
+                        catch (e) {
+                            console.log('tried to draw ' + pt.X + ', ' + pt.Y);
+                        }
 
+                        
                         if (config.GridUnderlap && config.GridEnabled) {
                             ctx.strokeStyle = config.GridColor;
 
@@ -1273,7 +1328,7 @@
                             
 
                         }
-
+                        
 
 
 
