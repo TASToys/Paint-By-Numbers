@@ -687,8 +687,13 @@
                                 }
 
                                 if (msg.trim().toLowerCase() == '!clear') {
-
-
+                                    for (var k in localStorage) {
+                                        if (k.indexOf('pbn-') == 0) {
+                                            localStorage.removeItem(k);
+                                        }
+                                    }
+                                    
+                                    Init();
 
                                 }
 
@@ -803,6 +808,12 @@
         //#region init
 
         (function () {
+            InitUI();
+            Init();
+            
+        })();
+
+        function InitUI() {
 
             canvas = document.getElementById('cv');
 
@@ -834,6 +845,17 @@
             if (window.obsstudio || queryList["mode"] == "obs") {
                 document.getElementsByTagName('body')[0].classList.add('obs');
             }
+        }
+
+        function Init() {
+
+            for (var k in localStorage) {
+                if (k.indexOf('pbn') == 0 && k.indexOf('-history') > -1) {
+                    localStorage.removeItem(k);
+                }
+            }
+
+
 
 
             //load if possible
@@ -858,7 +880,7 @@
                 if (localStorage.getItem('pbn-default') != null) {
                     LoadSettings('pbn-default');
                 }
-                if (queryList["seed"]) {
+                else if (queryList["seed"]) {
                     config = JSON.parse(atob(queryList["seed"]));
                     SaveSettings();
                     LoadSettings('pbn-' + config.Name);
@@ -870,13 +892,13 @@
             }
 
 
-            if (config.TwitchChannels.length > 0) {
+            if (config.TwitchChannels.length > 0 && ws==null) {
                 Connect();
             }
 
             //animationTimerId = setInterval(AnimationTick, 100);
             AnimationTick();
-        })();
+        }
 
         //#endregion
 
@@ -950,8 +972,8 @@
             isLoading = false;
             DrawGrid();
 
-            if (localStorage.getItem(configName + '-history') != null)
-                sceneHistory = JSON.parse(localStorage.getItem(configName + '-history'));
+            //if (localStorage.getItem(configName + '-history') != null)
+            //    sceneHistory = JSON.parse(localStorage.getItem(configName + '-history'));
             if (localStorage.getItem(configName + '-state') != null) {
                 state = JSON.parse(localStorage.getItem(configName + '-state'));
                 lastState = JSON.parse(localStorage.getItem(configName + '-state'));
@@ -1146,7 +1168,8 @@
                     DrawCell(parseInt(coordParts[0].trim(), 10) - 1, parseInt(coordParts[1].trim(), 10) - 1, c);
 
                     var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
-                    document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
+                    if (!document.getElementsByTagName('body')[0].classList.contains('obs'))
+                        document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
 
 
 
@@ -1157,7 +1180,7 @@
                     h.User = user;
                     h.Timestamp = (new Date()).getTime();
                     sceneHistory.push(h);
-                    localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
+                    //localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
 
                     lastState[h.X][h.Y].u = state[h.X][h.Y].u;
                     lastState[h.X][h.Y].t = state[h.X][h.Y].t;
