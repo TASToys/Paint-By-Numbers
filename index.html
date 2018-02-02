@@ -197,7 +197,7 @@
                 <li>
                     <label>Grid size/color:</label>
                     <input type="number" value="4" id="txtGridSize" min="1" max="100" />
-                    <input type="color" value="#b0b0b0" id="colGridColor" />
+                    <input type="color" value="#c0c0c0" id="colGridColor" />
                 </li>
                 <li>
                     <label>Grid line underlap</label>
@@ -217,7 +217,7 @@
                 <li>
                     <label>Emphasis frequency/color:</label>
                     <input type="number" value="10" id="txtEmphasisFrequency" />
-                    <input type="color" value="#808080" id="colEmphasisColor" />
+                    <input type="color" value="#a0a0a0" id="colEmphasisColor" />
                     <p class="info">Optional color every <em>n</em> cells</p>
                 </li>
                 <li>
@@ -622,11 +622,11 @@
             CanvasHeight: 720,
             GridEnabled: true,
             GridSize: 4,
-            GridColor: '#b0b0b0',
+            GridColor: '#c0c0c0',
             GridUnderlap: false,
             GridEmphasisEnabled: true,
             GridEmphasisFrequency: 10,
-            GridEmphasisColor: '#808080',
+            GridEmphasisColor: '#a0a0a0',
             GridWidth: 0,
             GridHeight: 0,
             TwitchChannels: [],
@@ -1154,37 +1154,50 @@
             }
 
             if (c != undefined) {
-                var coordParts = coords.split(',');
 
-                if (coordParts.length == 2) {
-                    DrawCell(parseInt(coordParts[0].trim(), 10) - 1, parseInt(coordParts[1].trim(), 10) - 1, c);
+                var coordSets = coords.split(';');
 
-                    var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
-                    if (!document.getElementsByTagName('body')[0].classList.contains('obs'))
-                        document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
+                coordSets.forEach(function (t) {
 
 
 
-                    var h = new PaintEvent();
-                    h.X = parseInt(coordParts[0], 10) - 1;
-                    h.Y = parseInt(coordParts[1], 10) - 1;
-                    h.Color = c;
-                    h.User = user;
-                    h.Timestamp = (new Date()).getTime();
-                    sceneHistory.push(h);
-                    //localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
+                    var coordParts = t.split(',');
 
-                    lastState[h.X][h.Y].u = state[h.X][h.Y].u;
-                    lastState[h.X][h.Y].t = state[h.X][h.Y].t;
-                    lastState[h.X][h.Y].c = state[h.X][h.Y].c;
+                    if (coordParts.length == 2) {
+                        DrawCell(parseInt(coordParts[0].trim(), 10) - 1, parseInt(coordParts[1].trim(), 10) - 1, c);
 
-                    state[h.X][h.Y].u = h.User;
-                    state[h.X][h.Y].t = h.Timestamp;
-                    state[h.X][h.Y].c = h.Color;
+                        var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
+                        if (!document.getElementsByTagName('body')[0].classList.contains('obs'))
+                            document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
 
-                    localStorage.setItem('pbn-' + config.Name + '-state', JSON.stringify(state));
-                }
+
+
+                        var h = new PaintEvent();
+                        h.X = parseInt(coordParts[0], 10) - 1;
+                        h.Y = parseInt(coordParts[1], 10) - 1;
+                        h.Color = c;
+                        h.User = user;
+                        h.Timestamp = (new Date()).getTime();
+                        sceneHistory.push(h);
+                        //localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
+
+                        lastState[h.X][h.Y].u = state[h.X][h.Y].u;
+                        lastState[h.X][h.Y].t = state[h.X][h.Y].t;
+                        lastState[h.X][h.Y].c = state[h.X][h.Y].c;
+
+                        state[h.X][h.Y].u = h.User;
+                        state[h.X][h.Y].t = h.Timestamp;
+                        state[h.X][h.Y].c = h.Color;
+
+                        localStorage.setItem('pbn-' + config.Name + '-state', JSON.stringify(state));
+                    }
+
+                });
+
+
             }
+
+
 
 
         }
@@ -1422,44 +1435,44 @@
 
                         //if (animationState[pt.X][pt.Y] == 0) {
 
-                            DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
+                        DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
 
-                            if (config.GridUnderlap && config.GridEnabled) {
-                                ctx.strokeStyle = config.GridColor;
+                        if (config.GridUnderlap && config.GridEnabled) {
+                            ctx.strokeStyle = config.GridColor;
 
-                                var x = pt.X * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
-                                    y = pt.Y * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
-                                    size = config.GridSize + (config.GridUnderlap ? 0 : 1);
-                                ctx.beginPath();
-                                ctx.moveTo(x, y + size);
-                                ctx.lineTo(x + size, y + size);
-                                ctx.lineTo(x + size, y);
-                                ctx.stroke();
-
-
-                                if (config.GridEmphasisEnabled) {
-                                    ctx.strokeStyle = config.GridEmphasisColor;
-
-                                    if ((pt.X + 1) % config.GridEmphasisFrequency == 0) {
-                                        ctx.beginPath();
-                                        ctx.moveTo(x + size, y);
-                                        ctx.lineTo(x + size, y + size);
-                                        ctx.stroke();
-                                    }
-
-                                    if ((pt.Y + 1) % config.GridEmphasisFrequency == 0) {
-                                        ctx.beginPath();
-                                        ctx.moveTo(x, y + size);
-                                        ctx.lineTo(x + size, y + size);
-                                        ctx.stroke();
-                                    }
+                            var x = pt.X * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
+                                y = pt.Y * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
+                                size = config.GridSize + (config.GridUnderlap ? 0 : 1);
+                            ctx.beginPath();
+                            ctx.moveTo(x, y + size);
+                            ctx.lineTo(x + size, y + size);
+                            ctx.lineTo(x + size, y);
+                            ctx.stroke();
 
 
+                            if (config.GridEmphasisEnabled) {
+                                ctx.strokeStyle = config.GridEmphasisColor;
+
+                                if ((pt.X + 1) % config.GridEmphasisFrequency == 0) {
+                                    ctx.beginPath();
+                                    ctx.moveTo(x + size, y);
+                                    ctx.lineTo(x + size, y + size);
+                                    ctx.stroke();
+                                }
+
+                                if ((pt.Y + 1) % config.GridEmphasisFrequency == 0) {
+                                    ctx.beginPath();
+                                    ctx.moveTo(x, y + size);
+                                    ctx.lineTo(x + size, y + size);
+                                    ctx.stroke();
                                 }
 
 
                             }
-                       // }
+
+
+                        }
+                        // }
 
 
 
