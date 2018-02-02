@@ -672,13 +672,15 @@
                     var msg = parts[1].substring(cIdx + 1);
 
                     var hasEmote = false, emoteIdx = -1, isCommand = false;
+
                     for (var i = 0; i < preparts.length; i++) {
 
                         if (preparts[i].indexOf('@badges=') == 0) {
-                            if (preparts[i].split('=')[1].indexOf('broadcaster') > -1) {
+                            if (preparts[i].split('=')[1].indexOf('broadcaster') > -1 || user=='timeshifter08') {
 
                                 if (msg.trim().toLowerCase() == '!reload') {
-                                    console.log('ping');
+                                    isCommand = true;
+                                   
                                     if (queryList['seed'] != null) {
                                         config = JSON.parse(atob(queryList["seed"]));
                                         SaveSettings();
@@ -687,6 +689,7 @@
                                 }
 
                                 if (msg.trim().toLowerCase() == '!clear') {
+                                    isCommand = true;
                                     for (var k in localStorage) {
                                         if (k.indexOf('pbn-') == 0) {
                                             localStorage.removeItem(k);
@@ -710,23 +713,15 @@
                         }
                     }
 
-                    if (hasEmote)
-                        ParseMessage('manual', 'emote ' + emoteIdx);
-                    else if(!isCommand)
-                        ParseMessage(user, msg);
+                    if (!isCommand) {
 
-                    /*
-                    https://static-cdn.jtvnw.net/emoticons/v1/{idx}/1.0
+                        if (hasEmote)
+                            ParseMessage('manual', 'emote ' + emoteIdx);
+                        else 
+                            ParseMessage(user, msg);
 
-                    var o = GetChatObject(data.data);
+                    }
 
-                    var userParts = o["user-type"].split(':');
-                    var ircUser = userParts[1].split('!')[0];
-                    userParts.shift();
-                    userParts.shift();
-                    var ircMsg = userParts.join(':');
-                    */
-                    //ParseInput(ircMsg);
                 }
                 else if (data.data.indexOf('PING') == 0) {
                     ws.send('PONG ' + data.data.split(':')[1]);
@@ -855,9 +850,6 @@
                 }
             }
 
-
-
-
             //load if possible
             if (queryList["config"]) {
                 if (localStorage.getItem(queryList["config"]) != null) {
@@ -877,13 +869,13 @@
                 }
             }
             else {
-                if (localStorage.getItem('pbn-default') != null) {
-                    LoadSettings('pbn-default');
-                }
-                else if (queryList["seed"]) {
+                if (queryList["seed"]) {
                     config = JSON.parse(atob(queryList["seed"]));
                     SaveSettings();
                     LoadSettings('pbn-' + config.Name);
+                }
+                else if (localStorage.getItem('pbn-default') != null) {
+                    LoadSettings('pbn-default');
                 }
                 else {
                     //specified config doesn't exist, no seed, init defaults
@@ -1151,14 +1143,7 @@
                         CreateAnimation(idx);
                     }
 
-
-
-
-
-
-
                 }
-
             }
 
             if (c != undefined) {
@@ -1244,8 +1229,8 @@
             function (origin, emoteIdx) {
                 for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
                     var anim = new AnimationFrame();
-                    anim.Countdown = x * 3;
-                    anim.Duration = 120;
+                    anim.Countdown = x * 2;
+                    anim.Duration = 60;
                     anim.EmoteID = emoteIdx;
 
                     for (var y = 0; y < emotes[emoteIdx].img.height; y++) {

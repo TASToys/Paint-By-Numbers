@@ -243,12 +243,12 @@
                     Y: <input type="number" value="720" id="txtEffectiveY" readonly />
                 </li>
                 <li>
-                    <label>Seed URL:</label>
-                    <input type="text" id="txtSeedURL" readonly />
+                    <label>OBS Browser Source URL:</label>
+                    <input type="text" id="txtURL" readonly />
                 </li>
                 <li>
-                    <label>Quick-load URL:</label>
-                    <input type="text" id="txtQuickURL" readonly />
+                    <label>Management URL:</label>
+                    <input type="text" id="txtManageURL" readonly />
                 </li>
             </ul>
         </div>
@@ -317,7 +317,7 @@
             this.User = '';
             this.Timestamp = 0;
             this.Color = '';
-        } 
+        }
 
         function CellState() {
             this.u = '';
@@ -609,6 +609,7 @@
             sceneHistory = [], //history of draw orders given
             state = [], //current state of the image
             lastState = [],
+            animationState=[], //int counts of any pending animations
 
             emotes = [], //array of already-loaded emotes
 
@@ -627,7 +628,7 @@
             GridEmphasisFrequency: 10,
             GridEmphasisColor: '#808080',
             GridWidth: 0,
-            GridHeight:0,
+            GridHeight: 0,
             TwitchChannels: [],
             Name: 'default'
         };
@@ -671,9 +672,41 @@
                     var cIdx = parts[1].indexOf(':');
                     var msg = parts[1].substring(cIdx + 1);
 
-                    var hasEmote = false, emoteIdx = -1;
+                    var hasEmote = false, emoteIdx = -1, isCommand = false;
+
                     for (var i = 0; i < preparts.length; i++) {
-                        if (preparts[i].indexOf('emotes=') == 0 && preparts[i].trim()!='emotes=') {
+
+                        if (preparts[i].indexOf('@badges=') == 0) {
+                            if (preparts[i].split('=')[1].indexOf('broadcaster') > -1 || user == 'timeshifter08') {
+
+                                if (msg.trim().toLowerCase() == '!reload') {
+                                    isCommand = true;
+
+                                    if (queryList['seed'] != null) {
+                                        config = JSON.parse(atob(queryList["seed"]));
+                                        SaveSettings();
+                                        LoadSettings('pbn-' + config.Name);
+                                    }
+                                }
+
+                                if (msg.trim().toLowerCase() == '!clear') {
+                                    isCommand = true;
+                                    for (var k in localStorage) {
+                                        if (k.indexOf('pbn-') == 0) {
+                                            localStorage.removeItem(k);
+                                        }
+                                    }
+
+                                    Init();
+
+                                }
+
+
+                            }
+                        }
+
+
+                        if (preparts[i].indexOf('emotes=') == 0 && preparts[i].trim() != 'emotes=') {
                             var emoteList = preparts[i].split('=')[1].split('/');
                             emoteIdx = parseInt(emoteList[0].split(':')[0], 10);
                             hasEmote = true;
@@ -681,23 +714,15 @@
                         }
                     }
 
-                    if (hasEmote)
-                        ParseMessage('manual', 'emote ' + emoteIdx);
-                    else
-                        ParseMessage(user, msg);
+                    if (!isCommand) {
 
-                    /*
-                    https://static-cdn.jtvnw.net/emoticons/v1/{idx}/1.0
+                        if (hasEmote)
+                            ParseMessage('manual', 'emote ' + emoteIdx);
+                        else
+                            ParseMessage(user, msg);
 
-                    var o = GetChatObject(data.data);
+                    }
 
-                    var userParts = o["user-type"].split(':');
-                    var ircUser = userParts[1].split('!')[0];
-                    userParts.shift();
-                    userParts.shift();
-                    var ircMsg = userParts.join(':');
-                    */
-                    //ParseInput(ircMsg);
                 }
                 else if (data.data.indexOf('PING') == 0) {
                     ws.send('PONG ' + data.data.split(':')[1]);
@@ -779,6 +804,12 @@
         //#region init
 
         (function () {
+            InitUI();
+            Init();
+
+        })();
+
+        function InitUI() {
 
             canvas = document.getElementById('cv');
 
@@ -810,7 +841,15 @@
             if (window.obsstudio || queryList["mode"] == "obs") {
                 document.getElementsByTagName('body')[0].classList.add('obs');
             }
+        }
 
+        function Init() {
+
+            for (var k in localStorage) {
+                if (k.indexOf('pbn') == 0 && k.indexOf('-history') > -1) {
+                    localStorage.removeItem(k);
+                }
+            }
 
             //load if possible
             if (queryList["config"]) {
@@ -831,28 +870,28 @@
                 }
             }
             else {
-                if (localStorage.getItem('pbn-default') != null) {
-                    LoadSettings('pbn-default');
-                }
-                else if (queryList["seed"]) {
-                    //no config, seed, load from seed
+                if (queryList["seed"]) {
                     config = JSON.parse(atob(queryList["seed"]));
                     SaveSettings();
                     LoadSettings('pbn-' + config.Name);
                 }
+                else if (localStorage.getItem('pbn-default') != null) {
+                    LoadSettings('pbn-default');
+                }
                 else {
-                    //no config, no seed, init defaults
+                    //specified config doesn't exist, no seed, init defaults
                     UpdateSettings();
                 }
             }
 
-            if (config.TwitchChannels.length > 0) {
+
+            if (config.TwitchChannels.length > 0 && ws == null) {
                 Connect();
             }
 
             //animationTimerId = setInterval(AnimationTick, 100);
             AnimationTick();
-        })();
+        }
 
         //#endregion
 
@@ -926,8 +965,8 @@
             isLoading = false;
             DrawGrid();
 
-            if (localStorage.getItem(configName + '-history') != null)
-                sceneHistory = JSON.parse(localStorage.getItem(configName + '-history'));
+            //if (localStorage.getItem(configName + '-history') != null)
+            //    sceneHistory = JSON.parse(localStorage.getItem(configName + '-history'));
             if (localStorage.getItem(configName + '-state') != null) {
                 state = JSON.parse(localStorage.getItem(configName + '-state'));
                 lastState = JSON.parse(localStorage.getItem(configName + '-state'));
@@ -945,8 +984,9 @@
         }
 
         function UpdateURLs() {
-            txtQuickURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
-            txtSeedURL.value = window.location.href.replace(window.location.search, '') + '?seed=' + btoa(JSON.stringify(config));
+            txtURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name + '&seed=' + btoa(JSON.stringify(config));
+            txtManageURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
+            //txtSeedURL.value = window.location.href.replace(window.location.search, '') + '?seed=' + btoa(JSON.stringify(config));
         }
 
         //#endregion
@@ -977,6 +1017,10 @@
 
             state = Create2DArray(gridDimX);
             lastState = Create2DArray(gridDimX);
+            animationState = Create2DArray(gridDimX);
+
+
+
             for (var x = 0; x < gridDimX; x++) {
                 for (var y = 0; y < gridDimY; y++) {
                     var s = new CellState();
@@ -985,6 +1029,8 @@
                     s.t = (new Date()).getTime();
                     state[x][y] = s;
                     lastState[x][y] = s;
+
+                    animationState[x][y] = 0;
                 }
             }
 
@@ -1104,14 +1150,7 @@
                         CreateAnimation(idx);
                     }
 
-
-
-
-
-
-
                 }
-
             }
 
             if (c != undefined) {
@@ -1121,7 +1160,8 @@
                     DrawCell(parseInt(coordParts[0].trim(), 10) - 1, parseInt(coordParts[1].trim(), 10) - 1, c);
 
                     var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
-                    document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
+                    if (!document.getElementsByTagName('body')[0].classList.contains('obs'))
+                        document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
 
 
 
@@ -1132,7 +1172,7 @@
                     h.User = user;
                     h.Timestamp = (new Date()).getTime();
                     sceneHistory.push(h);
-                    localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
+                    //localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
 
                     lastState[h.X][h.Y].u = state[h.X][h.Y].u;
                     lastState[h.X][h.Y].t = state[h.X][h.Y].t;
@@ -1155,7 +1195,7 @@
 
 
         function OnEmoteLoaded(e) {
-           // console.log(e);
+            // console.log(e);
             var parts;
             if (e.path) {
                 parts = e.path[0].src.split('/');
@@ -1186,18 +1226,16 @@
                 }
             }
 
-            console.log(emotes[idx]);
-
-
             CreateAnimation(idx);
         }
 
         var animations = [
+            //draw "slide-in" left to right
             function (origin, emoteIdx) {
                 for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
                     var anim = new AnimationFrame();
-                    anim.Countdown = x * 3;
-                    anim.Duration = 120;
+                    anim.Countdown = x * 2;
+                    anim.Duration = 90;
                     anim.EmoteID = emoteIdx;
 
                     for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
@@ -1206,14 +1244,97 @@
                             h.X = origin.X + x;
                             h.Y = origin.Y + y;
                             h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
-                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight)
+                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
                                 anim.DrawOrders.push(h);
+                               // animationState[h.X][h.Y]++;
+                            }
                         }
                     }
 
                     pendingAnimations.push(anim);
                 }
             },
+
+            //draw "slide-in" right to left
+            function (origin, emoteIdx) {
+                for (var x = emotes[emoteIdx].img.width-1; x >=0; x--) {
+                    var anim = new AnimationFrame();
+                    anim.Countdown = (emotes[emoteIdx].img.width-1-x) * 2;
+                    anim.Duration = 90;
+                    anim.EmoteID = emoteIdx;
+
+                    for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
+                        if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
+                            var h = new PaintEvent();
+                            h.X = origin.X + x;
+                            h.Y = origin.Y + y;
+                            h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
+                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
+                                anim.DrawOrders.push(h);
+                               // animationState[h.X][h.Y]++;
+                            }
+
+                        }
+                    }
+
+                    pendingAnimations.push(anim);
+                }
+            },
+
+            //draw "slide-in" top to bottom
+            function (origin, emoteIdx) {
+                for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
+                    var anim = new AnimationFrame();
+                    anim.Countdown = y * 2;
+                    anim.Duration = 90;
+                    anim.EmoteID = emoteIdx;
+
+                    for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
+                        if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
+                            var h = new PaintEvent();
+                            h.X = origin.X + x;
+                            h.Y = origin.Y + y;
+                            h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
+                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
+                                anim.DrawOrders.push(h);
+                                //animationState[h.X][h.Y]++;
+                            }
+                        }
+                    }
+
+                    pendingAnimations.push(anim);
+                }
+            },
+
+
+            //draw "slide-in" bottom to top
+            function (origin, emoteIdx) {
+                for (var y = emotes[emoteIdx].img.height - 1; y >= 0; y--) {
+                    var anim = new AnimationFrame();
+                    anim.Countdown = (emotes[emoteIdx].img.height - 1 - y) * 2;
+                    anim.Duration = 90;
+                    anim.EmoteID = emoteIdx;
+
+                    for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
+                        if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
+                            var h = new PaintEvent();
+                            h.X = origin.X + x;
+                            h.Y = origin.Y + y;
+                            h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
+                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
+                                anim.DrawOrders.push(h);
+                                //animationState[h.X][h.Y]++;
+                            }
+                        }
+                    }
+
+                    pendingAnimations.push(anim);
+                }
+            },
+
+
+
+            //random draw-in
             function (origin, emoteIdx) {
                 var drawPts = [];
 
@@ -1225,26 +1346,41 @@
                     }
                 }
 
-                var frameCounter = 0;
+                var frameCounter = 0, its=45;
 
-                while (drawPts.length > 0) {
-                    var idx = RandomInt(0, drawPts.length);
+                var ptsPer = Math.ceil(drawPts.length / its);
 
-                    var anim = new AnimationFrame();
-                    anim.Countdown = Math.floor(frameCounter/5);
-                    anim.Duration = 120;
-                    anim.EmoteID = emoteIdx;
 
-                    var h = new PaintEvent();
-                    h.X = drawPts[idx].X;
-                    h.Y = drawPts[idx].Y;
-                    h.Color = GetPixelFromImageData(emotes[emoteIdx].data, h.X, h.Y);
-                    anim.DrawOrders.push(h);
 
-                    pendingAnimations.push(anim);
+                for (var frame = 0; frame < its; frame++) {
+                    for (var i = 0; i < ptsPer; i++) {
+                        if (drawPts.length > 0) {
+                            var idx = RandomInt(0, drawPts.length);
 
-                    frameCounter++;
-                    drawPts.splice(idx, 1);
+                            var anim = new AnimationFrame();
+                            anim.Countdown = frame; //Math.floor(frameCounter / 5);
+                            anim.Duration = 90;
+                            anim.EmoteID = emoteIdx;
+
+                            try {
+                                var h = new PaintEvent();
+                                h.X = drawPts[idx].X;
+                                h.Y = drawPts[idx].Y;
+                                h.Color = GetPixelFromImageData(emotes[emoteIdx].data, h.X, h.Y);
+                                anim.DrawOrders.push(h);
+                                //animationState[h.X][h.Y]++;
+                                pendingAnimations.push(anim);
+                            }
+                            catch (e) {
+                                console.log(e);
+                            }
+
+
+                            frameCounter++;
+                            drawPts.splice(idx, 1);
+                        }
+                    }
+                    
                 }
 
             }
@@ -1252,15 +1388,15 @@
 
         function CreateAnimation(emoteIdx) {
 
-            var origin = new Point(RandomInt(0, config.GridWidth- emotes[emoteIdx].img.width-1), RandomInt(0,config.GridHeight- emotes[emoteIdx].img.height-1)),
+            var origin = new Point(RandomInt(0, config.GridWidth - emotes[emoteIdx].img.width - 1), RandomInt(0, config.GridHeight - emotes[emoteIdx].img.height - 1)),
                 i = RandomInt(0, animations.length);
-
+            //i = 4;
             animations[i](origin, emoteIdx);
         }
 
         function IsPixelOpaque(data, x, y) {
             var idx = (data.width * y + x) * 4;
-            return data.data[idx + 3] >0;
+            return data.data[idx + 3] > 0;
         }
 
         function GetPixelFromImageData(data, x, y) {
@@ -1269,66 +1405,61 @@
         }
 
         function AnimationTick() {
-            //console.log('tick');
             var removeList = [];
             for (var i = 0; i < pendingAnimations.length; i++) {
 
-                if (pendingAnimations[i].Countdown == 0) { //draw anim frame
+                if (pendingAnimations[i].Countdown == 0) {
                     pendingAnimations[i].DrawOrders.forEach(function (x) {
                         DrawCell(x.X, x.Y, x.Color);
+                        animationState[x.X][x.Y]++;
                     });
 
                 }
-                else if (pendingAnimations[i].Countdown<0 && Math.abs(pendingAnimations[i].Countdown) == pendingAnimations[i].Duration) { //undraw
+                else if (pendingAnimations[i].Countdown == -pendingAnimations[i].Duration) { //undraw
                     pendingAnimations[i].DrawOrders.forEach(function (pt) {
-                        try {
+
+                        animationState[pt.X][pt.Y]--;
+
+                        //if (animationState[pt.X][pt.Y] == 0) {
+
                             DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
-                        }
-                        catch (e) {
-                            console.log('tried to draw ' + pt.X + ', ' + pt.Y);
-                        }
 
-                        
-                        if (config.GridUnderlap && config.GridEnabled) {
-                            ctx.strokeStyle = config.GridColor;
+                            if (config.GridUnderlap && config.GridEnabled) {
+                                ctx.strokeStyle = config.GridColor;
 
-                            //if (config.GridEmphasisEnabled && (pt.X + 1) % config.GridEmphasisFrequency == 0) {
-                            //    ctx.strokeStyle = config.GridEmphasisColor;
-                            //}
-
-                            var x = pt.X * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
-                                y = pt.Y * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
-                                size = config.GridSize + (config.GridUnderlap ? 0 : 1);
-                            ctx.beginPath();
-                            ctx.moveTo(x, y+size);
-                            ctx.lineTo(x + size, y + size);
-                            ctx.lineTo(x + size, y);
-                            ctx.stroke();
+                                var x = pt.X * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
+                                    y = pt.Y * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
+                                    size = config.GridSize + (config.GridUnderlap ? 0 : 1);
+                                ctx.beginPath();
+                                ctx.moveTo(x, y + size);
+                                ctx.lineTo(x + size, y + size);
+                                ctx.lineTo(x + size, y);
+                                ctx.stroke();
 
 
-                            if (config.GridEmphasisEnabled) {
-                                ctx.strokeStyle = config.GridEmphasisColor;
+                                if (config.GridEmphasisEnabled) {
+                                    ctx.strokeStyle = config.GridEmphasisColor;
 
-                                if ((pt.X + 1) % config.GridEmphasisFrequency == 0) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(x + size, y);
-                                    ctx.lineTo(x + size, y + size);
-                                    ctx.stroke();
-                                }
+                                    if ((pt.X + 1) % config.GridEmphasisFrequency == 0) {
+                                        ctx.beginPath();
+                                        ctx.moveTo(x + size, y);
+                                        ctx.lineTo(x + size, y + size);
+                                        ctx.stroke();
+                                    }
 
-                                if ((pt.Y + 1) % config.GridEmphasisFrequency == 0) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(x, y + size);
-                                    ctx.lineTo(x + size, y + size);
-                                    ctx.stroke();
+                                    if ((pt.Y + 1) % config.GridEmphasisFrequency == 0) {
+                                        ctx.beginPath();
+                                        ctx.moveTo(x, y + size);
+                                        ctx.lineTo(x + size, y + size);
+                                        ctx.stroke();
+                                    }
+
+
                                 }
 
 
                             }
-                            
-
-                        }
-                        
+                       // }
 
 
 
@@ -1337,7 +1468,7 @@
                 }
 
                 pendingAnimations[i].Countdown--;
-                
+
             }
 
             for (var i = removeList.length - 1; i >= 0; i--) {
