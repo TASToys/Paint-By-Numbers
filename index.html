@@ -332,6 +332,13 @@
             this.DrawOrders = [];
         }
 
+        function PendingDraw() {
+            this.X = 0;
+            this.Y = 0;
+            this.Color = '';
+            this.Delay = 0;
+        }
+
         //#endregion
 
 
@@ -603,13 +610,12 @@
             settingsTimerId = -1, //timer variable for UI delay on update
             isLoading = false, //switch to ignore input change events while loading
 
-            animationTimerId = -1,
-
             queryList = {}, //name-indexed list of query string parameters
             sceneHistory = [], //history of draw orders given
             state = [], //current state of the image
             lastState = [],
-            animationState=[], //int counts of any pending animations
+            animationState = [], //int counts of any pending animations
+            pendingDraws=[], //
 
             emotes = [], //array of already-loaded emotes
 
@@ -744,7 +750,7 @@
         }
 
         /*
-            cheer/emote msg:
+        cheer/emote msg:
 
         @badges=broadcaster/1;
         color=#1E90FF;
@@ -752,6 +758,7 @@
         emote-only=1;
         emotes=25:0-4/41:6-13;
         id=6e46ba37-29a0-4ab3-9ca2-c07451e985f8;mod=0;room-id=61927669;subscriber=0;tmi-sent-ts=1516225093401;turbo=0;user-id=61927669;user-type= :timeshifter08!timeshifter08@timeshifter08.tmi.twitch.tv PRIVMSG #timeshifter08 :Kappa Kreygasm
+
 
         @badges=bits/1;
         bits=1;
@@ -769,19 +776,20 @@
         :timeshifter08!timeshifter08@timeshifter08.tmi.twitch.tv PRIVMSG #dwangoac :cheer1 Kreygasm
 
 
-                @badges=moderator/1,subscriber/0,bits/5000;
-                color=#FF4500;
-                display-name=MediaMagnet;
-                emotes=;
-                id=98a76159-e2f6-4080-bb5e-910cd54a6467;
-                mod=1;
-                room-id=70067886;
-                sent-ts=1509252055763;
-                subscriber=1;
-                tmi-sent-ts=1509252067701;
-                turbo=0;
-                user-id=111485954;
-                user-type=mod:mediamagnet!mediamagnet@mediamagnet.tmi.twitch.tv PRIVMSG #dwangoac :oh nice
+        @badges=moderator/1,subscriber/0,bits/5000;
+        color=#FF4500;
+        display-name=MediaMagnet;
+        emotes=;
+        id=98a76159-e2f6-4080-bb5e-910cd54a6467;
+        mod=1;
+        room-id=70067886;
+        sent-ts=1509252055763;
+        subscriber=1;
+        tmi-sent-ts=1509252067701;
+        turbo=0;
+        user-id=111485954;
+        user-type=mod:mediamagnet!mediamagnet@mediamagnet.tmi.twitch.tv PRIVMSG #dwangoac :oh nice
+
         */
 
         function GetChatObject(str) {
@@ -889,7 +897,6 @@
                 Connect();
             }
 
-            //animationTimerId = setInterval(AnimationTick, 100);
             AnimationTick();
         }
 
@@ -1157,19 +1164,29 @@
 
                 var coordSets = coords.split(';');
 
-                coordSets.forEach(function (t) {
+
+
+                for (var i = 0; i < coordSets.length; i++) {
 
 
 
-                    var coordParts = t.split(',');
+                    var coordParts = coordSets[i].split(',');
 
                     if (coordParts.length == 2) {
-                        DrawCell(parseInt(coordParts[0].trim(), 10) - 1, parseInt(coordParts[1].trim(), 10) - 1, c);
 
-                        var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
-                        if (!document.getElementsByTagName('body')[0].classList.contains('obs'))
+                        var p = new PendingDraw();
+                        p.X = parseInt(coordParts[0].trim(), 10) - 1;
+                        p.Y = parseInt(coordParts[1].trim(), 10) - 1;
+                        p.Color = c;
+                        p.Delay = i;
+                        pendingDraws.push(p);
+
+                        //DrawCell(parseInt(coordParts[0].trim(), 10) - 1, parseInt(coordParts[1].trim(), 10) - 1, c);
+
+                        if (!document.getElementsByTagName('body')[0].classList.contains('obs')) {
+                            var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
                             document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
-
+                        }
 
 
                         var h = new PaintEvent();
@@ -1189,13 +1206,12 @@
                         state[h.X][h.Y].t = h.Timestamp;
                         state[h.X][h.Y].c = h.Color;
 
-                        localStorage.setItem('pbn-' + config.Name + '-state', JSON.stringify(state));
                     }
 
-                });
-
-
+                }
+                localStorage.setItem('pbn-' + config.Name + '-state', JSON.stringify(state));
             }
+
 
 
 
@@ -1419,7 +1435,32 @@
 
         function AnimationTick() {
             var removeList = [];
+
+            for (var i = 0; i < pendingDraws.length; i++) {
+
+                if (pendingDraws[i].Delay <= 0) {
+                    removeList.push(i);
+                    DrawCell(pendingDraws[i].X, pendingDraws[i].Y, pendingDraws[i].Color);
+
+                }
+                else {
+
+                    pendingDraws[i].Delay--;
+
+                }
+                
+            }
+
+            for (var i = removeList.length - 1; i >= 0; i--) {
+                pendingDraws.splice(removeList[i], 1);
+            }
+
+            removeList = [];
+
             for (var i = 0; i < pendingAnimations.length; i++) {
+
+
+
 
                 if (pendingAnimations[i].Countdown == 0) {
                     pendingAnimations[i].DrawOrders.forEach(function (x) {
@@ -1435,7 +1476,6 @@
 
                         //if (animationState[pt.X][pt.Y] == 0) {
 
-                        DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
 
                         if (config.GridUnderlap && config.GridEnabled) {
                             ctx.strokeStyle = config.GridColor;
@@ -1474,6 +1514,7 @@
                         }
                         // }
 
+                        DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
 
 
                     });
@@ -1481,6 +1522,9 @@
                 }
 
                 pendingAnimations[i].Countdown--;
+
+
+
 
             }
 
