@@ -1469,8 +1469,11 @@
                     });
 
                 }
-                else if (pendingAnimations[i].Countdown == -pendingAnimations[i].Duration) { //undraw
-                    pendingAnimations[i].DrawOrders.forEach(function (pt) {
+                else if (pendingAnimations[i].Countdown <= -pendingAnimations[i].Duration) { //undraw
+                    // pendingAnimations[i].DrawOrders.forEach(function (pt) {
+
+                    for (var j = 0; j < pendingAnimations[i].DrawOrders.length; j++) {
+                        var pt = pendingAnimations[i].DrawOrders[j];
 
                         animationState[pt.X][pt.Y]--;
 
@@ -1516,8 +1519,9 @@
 
                         DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
 
+                    }
 
-                    });
+                    //});
                     removeList.push(i);
                 }
 
@@ -1529,7 +1533,7 @@
             }
 
             for (var i = removeList.length - 1; i >= 0; i--) {
-                pendingAnimations.splice(i, 1);
+                pendingAnimations.splice(removeList[i], 1);
             }
 
             requestAnimationFrame(AnimationTick);
