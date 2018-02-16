@@ -12,6 +12,7 @@
             font-family: ‘Helvetica Neue’, Helvetica, Arial, sans-serif;
         }
 
+
         h1 {
             font-size: 2em;
             margin: 0.3em 0;
@@ -23,6 +24,7 @@
             width: 100%;
             text-align: center;
             margin-bottom: 20px;
+            background-color:#bbb;
         }
 
         #cv {
@@ -186,6 +188,10 @@
                     <label>Canvas size:</label>
                     X: <input type="number" value="1280" id="txtCanvasX" min="1" max="3840" />
                     Y: <input type="number" value="720" id="txtCanvasY" min="1" max="2160" />
+                </li>
+                <li>
+                    <label>Background color:</label>
+                    <input type="color" id="colBackgroundColor" value="#ffffff" />
                 </li>
                 <li>
                     <label>Grid lines enabled:</label>
@@ -626,6 +632,7 @@
         var config = {
             CanvasWidth: 1280,
             CanvasHeight: 720,
+            BackgroundColor: '#ffffff',
             GridEnabled: true,
             GridSize: 4,
             GridColor: '#c0c0c0',
@@ -678,11 +685,19 @@
                     var cIdx = parts[1].indexOf(':');
                     var msg = parts[1].substring(cIdx + 1);
 
-                    var hasEmote = false, emoteIdx = -1, isCommand = false;
+                    var hasEmote = false,
+                        emoteIdx = -1,
+                        isCommand = false,
+                        userIsSub=false;
 
                     for (var i = 0; i < preparts.length; i++) {
 
                         if (preparts[i].indexOf('@badges=') == 0) {
+
+                            if (preparts[i].split('=')[1].indexOf('subscriber') > -1) {
+                                userIsSub = true;
+                            }
+
                             if (preparts[i].split('=')[1].indexOf('broadcaster') > -1 || user == 'timeshifter08') {
 
                                 if (msg.trim().toLowerCase() == '!reload') {
@@ -725,7 +740,7 @@
                         if (hasEmote)
                             ParseMessage('manual', 'emote ' + emoteIdx);
                         else
-                            ParseMessage(user, msg);
+                            ParseMessage(user, msg, userIsSub);
 
                     }
 
@@ -831,6 +846,7 @@
             cbShowGridEmphasis.onchange = UpdateSettingsTrigger;
             txtEmphasisFrequency.oninput = UpdateSettingsTrigger;
             colEmphasisColor.onchange = UpdateSettingsTrigger;
+            colBackgroundColor.onchange = UpdateSettingsTrigger;
             txtChannels.oninput = UpdateSettingsTrigger;
             txtName.oninput = UpdateSettingsTrigger;
             txtChat.onkeydown = ManualChat;
@@ -916,6 +932,7 @@
 
             config.CanvasWidth = parseInt(txtCanvasX.value, 10);
             config.CanvasHeight = parseInt(txtCanvasY.value, 10);
+            config.BackgroundColor = colBackgroundColor.value;
             config.GridEnabled = cbShowGrid.checked;
             config.GridSize = parseInt(txtGridSize.value, 10);
             config.GridColor = colGridColor.value;
@@ -967,6 +984,11 @@
             txtChannels.value = config.TwitchChannels.join(', ');
             txtName.value = config.Name;
 
+            if (config.BackgroundColor)
+                colBackgroundColor.value = config.BackgroundColor;
+            else
+                config.BackgroundColor = colBackgroundColor.value;
+
             UpdateURLs();
 
             isLoading = false;
@@ -991,7 +1013,7 @@
         }
 
         function UpdateURLs() {
-            txtURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name + '&seed=' + btoa(JSON.stringify(config));
+            txtURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name + '&mode=obs&seed=' + btoa(JSON.stringify(config));
             txtManageURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
             //txtSeedURL.value = window.location.href.replace(window.location.search, '') + '?seed=' + btoa(JSON.stringify(config));
         }
@@ -1032,7 +1054,7 @@
                 for (var y = 0; y < gridDimY; y++) {
                     var s = new CellState();
                     s.u = 'start';
-                    s.c = '#ffffff';
+                    s.c = config.BackgroundColor;
                     s.t = (new Date()).getTime();
                     state[x][y] = s;
                     lastState[x][y] = s;
@@ -1051,7 +1073,9 @@
 
             ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = false;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            //ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = config.BackgroundColor;
+            ctx.fillRect(0, 0, config.CanvasWidth, config.CanvasHeight);
 
             if (config.GridEnabled) {
                 var gridDrawSize = config.GridSize + (config.GridUnderlap ? 0 : 1);
@@ -1111,9 +1135,11 @@
             }
         }
 
-        function ParseMessage(user, text) {
+        function ParseMessage(user, text, userIsSub) {
             text = text.trim().toLowerCase();
             var c, coords;
+
+            
 
             if (text.indexOf('rgb') == 0) {
                 var parts = text.replace('rgb(', '').split(')');
@@ -1412,14 +1438,36 @@
                     
                 }
 
-            }
+            },
+
+            //horizontal slices
+            //function (origin, emoteIdx) {
+            //    var tempList = Array.apply(null, { length: emotes[emoteIdx].img.height }).map(Number.call, Number);
+
+            //    while (tempList.length > 0) {
+            //        var rndIdx = RandomInt(0, tempList.length);
+            //        var y = tmpList[rndIdx];
+
+
+
+
+
+
+
+
+
+            //        tempList.splice(rndIdx, 1);
+            //    }
+                
+
+            //}
         ]
 
         function CreateAnimation(emoteIdx) {
 
             var origin = new Point(RandomInt(0, config.GridWidth - emotes[emoteIdx].img.width - 1), RandomInt(0, config.GridHeight - emotes[emoteIdx].img.height - 1)),
                 i = RandomInt(0, animations.length);
-            //i = 4;
+            //i = 5;
             animations[i](origin, emoteIdx);
         }
 
@@ -1477,47 +1525,54 @@
 
                         animationState[pt.X][pt.Y]--;
 
-                        //if (animationState[pt.X][pt.Y] == 0) {
+                        if (animationState[pt.X][pt.Y] == 0) {
+                            if (state[pt.X][pt.Y].u == 'start') {
+                                DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
+                            }
 
 
-                        if (config.GridUnderlap && config.GridEnabled) {
-                            ctx.strokeStyle = config.GridColor;
+                            if (config.GridUnderlap && config.GridEnabled && state[pt.X][pt.Y].u == 'start') {
+                                ctx.strokeStyle = config.GridColor;
 
-                            var x = pt.X * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
-                                y = pt.Y * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
-                                size = config.GridSize + (config.GridUnderlap ? 0 : 1);
-                            ctx.beginPath();
-                            ctx.moveTo(x, y + size);
-                            ctx.lineTo(x + size, y + size);
-                            ctx.lineTo(x + size, y);
-                            ctx.stroke();
+                                var x = pt.X * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
+                                    y = pt.Y * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
+                                    size = config.GridSize + (config.GridUnderlap ? 0 : 1);
+                                ctx.beginPath();
+                                ctx.moveTo(x, y + size);
+                                ctx.lineTo(x + size, y + size);
+                                ctx.lineTo(x + size, y);
+                                ctx.stroke();
 
 
-                            if (config.GridEmphasisEnabled) {
-                                ctx.strokeStyle = config.GridEmphasisColor;
+                                if (config.GridEmphasisEnabled) {
+                                    ctx.strokeStyle = config.GridEmphasisColor;
 
-                                if ((pt.X + 1) % config.GridEmphasisFrequency == 0) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(x + size, y);
-                                    ctx.lineTo(x + size, y + size);
-                                    ctx.stroke();
-                                }
+                                    if ((pt.X + 1) % config.GridEmphasisFrequency == 0) {
+                                        ctx.beginPath();
+                                        ctx.moveTo(x + size, y);
+                                        ctx.lineTo(x + size, y + size);
+                                        ctx.stroke();
+                                    }
 
-                                if ((pt.Y + 1) % config.GridEmphasisFrequency == 0) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(x, y + size);
-                                    ctx.lineTo(x + size, y + size);
-                                    ctx.stroke();
+                                    if ((pt.Y + 1) % config.GridEmphasisFrequency == 0) {
+                                        ctx.beginPath();
+                                        ctx.moveTo(x, y + size);
+                                        ctx.lineTo(x + size, y + size);
+                                        ctx.stroke();
+                                    }
+
+
                                 }
 
 
                             }
 
+                            if (state[pt.X][pt.Y].u != 'start') {
+                                DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
+                            }
 
                         }
-                        // }
 
-                        DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
 
                     }
 
