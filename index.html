@@ -835,7 +835,6 @@
             //one pixel per frame
             if (sceneHistory.length <= duration) {
                 redrawTimer = sceneHistory.length + 1;
-                duration = Math.max(sceneHistory.length, 120);
 
                 for (var i = 0; i < sceneHistory.length; i++) {
                     var h = sceneHistory[i];
@@ -850,7 +849,7 @@
 
             }
             else {
-                var ppt = duration / sceneHistory.length, 
+                var ppt = duration / sceneHistory.length,
                     currDelay = 1;
                 redrawTimer = duration + 1;
 
@@ -861,7 +860,7 @@
                     p.Y = h.Y;
                     p.Color = h.Color;
                     p.Delay = Math.floor(currDelay);
-                    
+
                     pendingDraws.push(p);
                     currDelay += ppt;
                     gridStatus[h.X][h.Y] = 1;
@@ -870,24 +869,24 @@
 
             
 
-            for (var x = 0; x < config.GridWidth; x++) {
-                for (var y = 0; y < config.GridHeight; y++) {
-                    if (gridStatus[x][y] == 0) {
-                        var p = new PendingDraw();
-                        p.X = x;
-                        p.Y = y;
-                        if (state[x] && state[x][y])
-                            p.Color = state[x][y].c;
-                        else
-                            p.Color = config.BackgroundColor;
+            //for (var x = 0; x < config.GridWidth; x++) {
+            //    for (var y = 0; y < config.GridHeight; y++) {
+            //        if (gridStatus[x][y] == 0) {
+            //            var p = new PendingDraw();
+            //            p.X = x;
+            //            p.Y = y;
+            //            if (state[x] && state[x][y])
+            //                p.Color = state[x][y].c;
+            //            else
+            //                p.Color = config.BackgroundColor;
 
-                        p.Delay = RandomInt(1, 1 + duration);
-                        pendingDraws.push(p);
+            //            p.Delay = RandomInt(1, 1 + duration);
+            //            pendingDraws.push(p);
 
                         
-                    }
-                }
-            }
+            //        }
+            //    }
+            //}
 
 
         }
@@ -1034,6 +1033,49 @@
                     //specified config doesn't exist, no seed, init defaults
                     UpdateSettings();
                 }
+            }
+
+            if (state.length < config.GridWidth) {
+                for (var i = 0; i < config.GridWidth; i++) {
+                    if (!state[i]) {
+                        state[i] = [];
+                        lastState[i] = [];
+                    }
+                }
+            }
+
+
+            var tmpList = [];
+
+            for (var x = 0; x < state.length; x++) {
+                for (var y = 0; y < state[0].length; y++) {
+                    if (state[x][y]) {
+
+                        if (state[x][y].u != 'start') {
+                            var h = new PaintEvent();
+                            h.X = x;
+                            h.Y = y;
+                            h.Color = state[x][y].c;
+                            h.User = state[x][y].u;
+                            h.Timestamp = state[x][y].t;
+                            tmpList.push(h);
+                        }
+                    }
+                    else {
+                        var s = new CellState();
+                        s.u = 'start';
+                        s.c = config.BackgroundColor;
+                        s.t = (new Date()).getTime();
+                        state[x][y] = s;
+                        lastState[x][y] = s;
+                    }
+                }
+            }
+
+            tmpList.sort((a, b) => { return a.Timestamp > b.Timestamp ? 1 : -1; });
+
+            for (var i = 0; i < tmpList.length; i++) {
+                sceneHistory.push(tmpList[i]);
             }
 
 
