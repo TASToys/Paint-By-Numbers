@@ -835,7 +835,6 @@
             //one pixel per frame
             if (sceneHistory.length <= duration) {
                 redrawTimer = sceneHistory.length + 1;
-                duration = Math.max(sceneHistory.length, 120);
 
                 for (var i = 0; i < sceneHistory.length; i++) {
                     var h = sceneHistory[i];
@@ -870,24 +869,24 @@
 
 
 
-            for (var x = 0; x < config.GridWidth; x++) {
-                for (var y = 0; y < config.GridHeight; y++) {
-                    if (gridStatus[x][y] == 0) {
-                        var p = new PendingDraw();
-                        p.X = x;
-                        p.Y = y;
-                        if (state[x] && state[x][y])
-                            p.Color = state[x][y].c;
-                        else
-                            p.Color = config.BackgroundColor;
+            //for (var x = 0; x < config.GridWidth; x++) {
+            //    for (var y = 0; y < config.GridHeight; y++) {
+            //        if (gridStatus[x][y] == 0) {
+            //            var p = new PendingDraw();
+            //            p.X = x;
+            //            p.Y = y;
+            //            if (state[x] && state[x][y])
+            //                p.Color = state[x][y].c;
+            //            else
+            //                p.Color = config.BackgroundColor;
 
-                        p.Delay = RandomInt(1, 1 + duration);
-                        pendingDraws.push(p);
+            //            p.Delay = RandomInt(1, 1 + duration);
+            //            pendingDraws.push(p);
 
 
-                    }
-                }
-            }
+            //        }
+            //    }
+            //}
 
 
         }
@@ -1054,7 +1053,7 @@
                 }
             }
 
-            tmpList.sort((a, b) => { return a.t > b.t ? -1 : 1; });
+            tmpList.sort((a, b) => { return a.Timestamp > b.Timestamp ? 1 : -1; });
 
             for (var i = 0; i < tmpList.length; i++) {
                 sceneHistory.push(tmpList[i]);
