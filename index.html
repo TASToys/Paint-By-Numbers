@@ -767,13 +767,15 @@
 
                         var isSub = -1;
 
-                        for (var i = 0; i < lineParts.length; i++) {
+                        var msgParts = lineParts[0].split(';');
 
-                            if (lineParts[i] == 'msg-id=sub') {
+                        for (var i = 0; i < msgParts.length; i++) {
+
+                            if (msgParts[i] == 'msg-id=sub') {
                                 isSub = 0;
                                 break;
                             }
-                            else if (lineParts[i] == 'msg-id=resub') {
+                            else if (msgParts[i] == 'msg-id=resub') {
                                 isSub = 1;
                                 break;
                             }
