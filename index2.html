@@ -12,6 +12,7 @@
             font-family: ‘Helvetica Neue’, Helvetica, Arial, sans-serif;
         }
 
+
         h1 {
             font-size: 2em;
             margin: 0.3em 0;
@@ -188,6 +189,10 @@
                     Y: <input type="number" value="720" id="txtCanvasY" min="1" max="2160" />
                 </li>
                 <li>
+                    <label>Background color:</label>
+                    <input type="color" id="colBackgroundColor" value="#ffffff" />
+                </li>
+                <li>
                     <label>Grid lines enabled:</label>
                     <label class="switch">
                         <input type="checkbox" id="cbShowGrid" checked />
@@ -197,7 +202,7 @@
                 <li>
                     <label>Grid size/color:</label>
                     <input type="number" value="4" id="txtGridSize" min="1" max="100" />
-                    <input type="color" value="#b0b0b0" id="colGridColor" />
+                    <input type="color" value="#c0c0c0" id="colGridColor" />
                 </li>
                 <li>
                     <label>Grid line underlap</label>
@@ -217,7 +222,7 @@
                 <li>
                     <label>Emphasis frequency/color:</label>
                     <input type="number" value="10" id="txtEmphasisFrequency" />
-                    <input type="color" value="#808080" id="colEmphasisColor" />
+                    <input type="color" value="#a0a0a0" id="colEmphasisColor" />
                     <p class="info">Optional color every <em>n</em> cells</p>
                 </li>
                 <li>
@@ -330,6 +335,13 @@
             this.Countdown = 0;
             this.Duration = 30;
             this.DrawOrders = [];
+        }
+
+        function PendingDraw() {
+            this.X = 0;
+            this.Y = 0;
+            this.Color = '';
+            this.Delay = 0;
         }
 
         //#endregion
@@ -603,12 +615,13 @@
             settingsTimerId = -1, //timer variable for UI delay on update
             isLoading = false, //switch to ignore input change events while loading
 
-            animationTimerId = -1,
-
             queryList = {}, //name-indexed list of query string parameters
             sceneHistory = [], //history of draw orders given
             state = [], //current state of the image
             lastState = [],
+            animationState = [], //int counts of any pending animations
+            pendingDraws = [], //
+            redrawTimer = 0, //keeps track of how long a re/sub redraw will take, so new draw orders can be offset correctly
 
             emotes = [], //array of already-loaded emotes
 
@@ -619,15 +632,16 @@
         var config = {
             CanvasWidth: 1280,
             CanvasHeight: 720,
+            BackgroundColor: '#ffffff',
             GridEnabled: true,
             GridSize: 4,
-            GridColor: '#b0b0b0',
+            GridColor: '#c0c0c0',
             GridUnderlap: false,
             GridEmphasisEnabled: true,
             GridEmphasisFrequency: 10,
-            GridEmphasisColor: '#808080',
+            GridEmphasisColor: '#a0a0a0',
             GridWidth: 0,
-            GridHeight:0,
+            GridHeight: 0,
             TwitchChannels: [],
             Name: 'default'
         };
@@ -659,72 +673,128 @@
             }
 
             //show raw data
-            ws.onmessage = function (data) {
-                if (debug)
-                    console.log(data.data);
+            ws.onmessage = function (msgEvent) {
+                var lines = msgEvent.data.split('\r\n');
+                for (var l = 0; l < lines.length; l++) {
+                    var line = lines[l].trim();
+                    if (line == '')
+                        continue;
 
-                if (data.data.indexOf('PRIVMSG') > -1) {
-                    var parts = data.data.split('PRIVMSG');
-                    var preparts = parts[0].split(';');
-                    var user = preparts[preparts.length - 1].split(':')[1].split('!')[0];
+                    var lineParts = line.split(' ');
 
-                    var cIdx = parts[1].indexOf(':');
-                    var msg = parts[1].substring(cIdx + 1);
+                    if (debug)
+                        console.log(line);
 
-                    var hasEmote = false, emoteIdx = -1, isCommand = false;
+                    if (lineParts[0] == 'PING') {
+                        ws.send('PONG ' + line.split(':')[1]);
+                    }
+                    else if (lineParts[2] == 'PRIVMSG') {
+                        var parts = line.split('PRIVMSG');
+                        var preparts = parts[0].split(';');
+                        var user = preparts[preparts.length - 1].split(':')[1].split('!')[0];
 
-                    for (var i = 0; i < preparts.length; i++) {
+                        var cIdx = parts[1].indexOf(':');
+                        var msg = parts[1].substring(cIdx + 1);
 
-                        if (preparts[i].indexOf('@badges=') == 0) {
-                            if (preparts[i].split('=')[1].indexOf('broadcaster') > -1 || user=='timeshifter08') {
+                        var hasEmote = false,
+                            emoteIdx = -1,
+                            isCommand = false,
+                            userIsSub = false;
 
-                                if (msg.trim().toLowerCase() == '!reload') {
-                                    isCommand = true;
-                                   
-                                    if (queryList['seed'] != null) {
-                                        config = JSON.parse(atob(queryList["seed"]));
-                                        SaveSettings();
-                                        LoadSettings('pbn-' + config.Name);
-                                    }
+                        for (var i = 0; i < preparts.length; i++) {
+
+                            if (preparts[i].indexOf('@badges=') == 0) {
+
+                                if (preparts[i].split('=')[1].indexOf('subscriber') > -1) {
+                                    userIsSub = true;
                                 }
 
-                                if (msg.trim().toLowerCase() == '!clear') {
-                                    isCommand = true;
-                                    for (var k in localStorage) {
-                                        if (k.indexOf('pbn-') == 0) {
-                                            localStorage.removeItem(k);
+                                if (preparts[i].split('=')[1].indexOf('broadcaster') > -1 || user == 'timeshifter08') {
+
+                                    if (msg.trim().toLowerCase() == '!reload') {
+                                        isCommand = true;
+
+                                        if (queryList['seed'] != null) {
+                                            config = JSON.parse(atob(queryList["seed"]));
+                                            SaveSettings();
+                                            LoadSettings('pbn-' + config.Name);
                                         }
                                     }
-                                    
-                                    Init();
+
+                                    if (msg.trim().toLowerCase() == '!clear') {
+                                        isCommand = true;
+                                        for (var k in localStorage) {
+                                            if (k.indexOf('pbn-') == 0) {
+                                                localStorage.removeItem(k);
+                                            }
+                                        }
+
+                                        Init();
+
+                                    }
+
+                                    if (msg.trim().toLowerCase() == '!redraw') {
+
+                                        GenerateRedraw(-1);
+
+                                    }
+
 
                                 }
+                            }
 
+
+                            if (preparts[i].indexOf('emotes=') == 0 && preparts[i].trim() != 'emotes=') {
+                                var emoteList = preparts[i].split('=')[1].split('/');
+                                emoteIdx = parseInt(emoteList[0].split(':')[0], 10);
+                                hasEmote = true;
 
                             }
                         }
 
+                        if (!isCommand) {
 
-                        if (preparts[i].indexOf('emotes=') == 0 && preparts[i].trim() != 'emotes=') {
-                            var emoteList = preparts[i].split('=')[1].split('/');
-                            emoteIdx = parseInt(emoteList[0].split(':')[0], 10);
-                            hasEmote = true;
+                            if (hasEmote)
+                                ParseMessage('manual', 'emote ' + emoteIdx);
+                            else
+                                ParseMessage(user, msg, userIsSub);
 
                         }
-                    }
-
-                    if (!isCommand) {
-
-                        if (hasEmote)
-                            ParseMessage('manual', 'emote ' + emoteIdx);
-                        else 
-                            ParseMessage(user, msg);
 
                     }
 
-                }
-                else if (data.data.indexOf('PING') == 0) {
-                    ws.send('PONG ' + data.data.split(':')[1]);
+                    else if (lineParts[2] == 'USERNOTICE') {
+
+                        var isSub = -1;
+
+                        var msgParts = lineParts[0].split(';');
+
+                        for (var i = 0; i < msgParts.length; i++) {
+
+                            if (msgParts[i] == 'msg-id=sub') {
+                                isSub = 0;
+                                break;
+                            }
+                            else if (msgParts[i] == 'msg-id=resub') {
+                                isSub = 1;
+                                break;
+                            }
+                            else if (msgParts[i] == 'msg-id=subgift') {
+                                isSub = 2;
+                                break;
+                            }
+
+                        }
+
+                        if (isSub >= 0) {
+
+
+                            GenerateRedraw(isSub);
+
+                        }
+
+                    }
+
                 }
             }
 
@@ -742,8 +812,88 @@
             }
         }
 
+
+
+        function GenerateRedraw(subImg) {
+
+            var duration = 60 * 10;
+
+            var gridStatus = Create2DArray(config.GridWidth);
+
+            for (var x = 0; x < config.GridWidth; x++) {
+                for (var y = 0; y < config.GridHeight; y++) {
+                    gridStatus[x][y] = 0;
+                    var p = new PendingDraw();
+                    p.X = x;
+                    p.Y = y;
+                    p.Color = config.BackgroundColor;
+                    p.Delay = 0;
+                    pendingDraws.push(p);
+                }
+            }
+
+            //one pixel per frame
+            if (sceneHistory.length <= duration) {
+                redrawTimer = sceneHistory.length + 1;
+                duration = Math.max(sceneHistory.length, 120);
+
+                for (var i = 0; i < sceneHistory.length; i++) {
+                    var h = sceneHistory[i];
+                    var p = new PendingDraw();
+                    p.X = h.X;
+                    p.Y = h.Y;
+                    p.Color = h.Color;
+                    p.Delay = i + 1;
+                    pendingDraws.push(p);
+                    gridStatus[h.X][h.Y] = 1;
+                }
+
+            }
+            else {
+                var ppt = duration / sceneHistory.length,
+                    currDelay = 1;
+                redrawTimer = duration + 1;
+
+                for (var i = 0; i < sceneHistory.length; i++) {
+                    var h = sceneHistory[i];
+                    var p = new PendingDraw();
+                    p.X = h.X;
+                    p.Y = h.Y;
+                    p.Color = h.Color;
+                    p.Delay = Math.floor(currDelay);
+
+                    pendingDraws.push(p);
+                    currDelay += ppt;
+                    gridStatus[h.X][h.Y] = 1;
+                }
+            }
+
+
+
+            for (var x = 0; x < config.GridWidth; x++) {
+                for (var y = 0; y < config.GridHeight; y++) {
+                    if (gridStatus[x][y] == 0) {
+                        var p = new PendingDraw();
+                        p.X = x;
+                        p.Y = y;
+                        if (state[x] && state[x][y])
+                            p.Color = state[x][y].c;
+                        else
+                            p.Color = config.BackgroundColor;
+
+                        p.Delay = RandomInt(1, 1 + duration);
+                        pendingDraws.push(p);
+
+
+                    }
+                }
+            }
+
+
+        }
+
         /*
-            cheer/emote msg:
+        cheer/emote msg:
 
         @badges=broadcaster/1;
         color=#1E90FF;
@@ -751,6 +901,7 @@
         emote-only=1;
         emotes=25:0-4/41:6-13;
         id=6e46ba37-29a0-4ab3-9ca2-c07451e985f8;mod=0;room-id=61927669;subscriber=0;tmi-sent-ts=1516225093401;turbo=0;user-id=61927669;user-type= :timeshifter08!timeshifter08@timeshifter08.tmi.twitch.tv PRIVMSG #timeshifter08 :Kappa Kreygasm
+
 
         @badges=bits/1;
         bits=1;
@@ -768,19 +919,20 @@
         :timeshifter08!timeshifter08@timeshifter08.tmi.twitch.tv PRIVMSG #dwangoac :cheer1 Kreygasm
 
 
-                @badges=moderator/1,subscriber/0,bits/5000;
-                color=#FF4500;
-                display-name=MediaMagnet;
-                emotes=;
-                id=98a76159-e2f6-4080-bb5e-910cd54a6467;
-                mod=1;
-                room-id=70067886;
-                sent-ts=1509252055763;
-                subscriber=1;
-                tmi-sent-ts=1509252067701;
-                turbo=0;
-                user-id=111485954;
-                user-type=mod:mediamagnet!mediamagnet@mediamagnet.tmi.twitch.tv PRIVMSG #dwangoac :oh nice
+        @badges=moderator/1,subscriber/0,bits/5000;
+        color=#FF4500;
+        display-name=MediaMagnet;
+        emotes=;
+        id=98a76159-e2f6-4080-bb5e-910cd54a6467;
+        mod=1;
+        room-id=70067886;
+        sent-ts=1509252055763;
+        subscriber=1;
+        tmi-sent-ts=1509252067701;
+        turbo=0;
+        user-id=111485954;
+        user-type=mod:mediamagnet!mediamagnet@mediamagnet.tmi.twitch.tv PRIVMSG #dwangoac :oh nice
+
         */
 
         function GetChatObject(str) {
@@ -805,7 +957,7 @@
         (function () {
             InitUI();
             Init();
-            
+
         })();
 
         function InitUI() {
@@ -822,6 +974,7 @@
             cbShowGridEmphasis.onchange = UpdateSettingsTrigger;
             txtEmphasisFrequency.oninput = UpdateSettingsTrigger;
             colEmphasisColor.onchange = UpdateSettingsTrigger;
+            colBackgroundColor.onchange = UpdateSettingsTrigger;
             txtChannels.oninput = UpdateSettingsTrigger;
             txtName.oninput = UpdateSettingsTrigger;
             txtChat.onkeydown = ManualChat;
@@ -883,12 +1036,35 @@
                 }
             }
 
+            var tmpList = [];
 
-            if (config.TwitchChannels.length > 0 && ws==null) {
+            for (var x = 0; x < state.length; x++) {
+                for (var y = 0; y < state[0].length; y++) {
+
+                    if (state[x][y].u != 'start') {
+                        var h = new PaintEvent();
+                        h.X = x;
+                        h.Y = y;
+                        h.Color = state[x][y].c;
+                        h.User = state[x][y].u;
+                        h.Timestamp = state[x][y].t;
+                        tmpList.push(h);
+                    }
+
+                }
+            }
+
+            tmpList.sort((a, b) => { return a.t > b.t ? -1 : 1; });
+
+            for (var i = 0; i < tmpList.length; i++) {
+                sceneHistory.push(tmpList[i]);
+            }
+
+
+            if (config.TwitchChannels.length > 0 && ws == null) {
                 Connect();
             }
 
-            //animationTimerId = setInterval(AnimationTick, 100);
             AnimationTick();
         }
 
@@ -908,6 +1084,7 @@
 
             config.CanvasWidth = parseInt(txtCanvasX.value, 10);
             config.CanvasHeight = parseInt(txtCanvasY.value, 10);
+            config.BackgroundColor = colBackgroundColor.value;
             config.GridEnabled = cbShowGrid.checked;
             config.GridSize = parseInt(txtGridSize.value, 10);
             config.GridColor = colGridColor.value;
@@ -959,6 +1136,11 @@
             txtChannels.value = config.TwitchChannels.join(', ');
             txtName.value = config.Name;
 
+            if (config.BackgroundColor)
+                colBackgroundColor.value = config.BackgroundColor;
+            else
+                config.BackgroundColor = colBackgroundColor.value;
+
             UpdateURLs();
 
             isLoading = false;
@@ -983,7 +1165,7 @@
         }
 
         function UpdateURLs() {
-            txtURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name + '&seed=' + btoa(JSON.stringify(config));
+            txtURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name + '&mode=obs&seed=' + btoa(JSON.stringify(config));
             txtManageURL.value = window.location.href.replace(window.location.search, '') + '?config=pbn-' + config.Name;
             //txtSeedURL.value = window.location.href.replace(window.location.search, '') + '?seed=' + btoa(JSON.stringify(config));
         }
@@ -1016,14 +1198,20 @@
 
             state = Create2DArray(gridDimX);
             lastState = Create2DArray(gridDimX);
+            animationState = Create2DArray(gridDimX);
+
+
+
             for (var x = 0; x < gridDimX; x++) {
                 for (var y = 0; y < gridDimY; y++) {
                     var s = new CellState();
                     s.u = 'start';
-                    s.c = '#ffffff';
+                    s.c = config.BackgroundColor;
                     s.t = (new Date()).getTime();
                     state[x][y] = s;
                     lastState[x][y] = s;
+
+                    animationState[x][y] = 0;
                 }
             }
 
@@ -1037,7 +1225,9 @@
 
             ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = false;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            //ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = config.BackgroundColor;
+            ctx.fillRect(0, 0, config.CanvasWidth, config.CanvasHeight);
 
             if (config.GridEnabled) {
                 var gridDrawSize = config.GridSize + (config.GridUnderlap ? 0 : 1);
@@ -1097,9 +1287,11 @@
             }
         }
 
-        function ParseMessage(user, text) {
+        function ParseMessage(user, text, userIsSub) {
             text = text.trim().toLowerCase();
             var c, coords;
+
+
 
             if (text.indexOf('rgb') == 0) {
                 var parts = text.replace('rgb(', '').split(')');
@@ -1147,37 +1339,59 @@
             }
 
             if (c != undefined) {
-                var coordParts = coords.split(',');
 
-                if (coordParts.length == 2) {
-                    DrawCell(parseInt(coordParts[0].trim(), 10) - 1, parseInt(coordParts[1].trim(), 10) - 1, c);
-
-                    var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
-                    if (!document.getElementsByTagName('body')[0].classList.contains('obs'))
-                        document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
+                var coordSets = coords.split(';');
 
 
 
-                    var h = new PaintEvent();
-                    h.X = parseInt(coordParts[0], 10) - 1;
-                    h.Y = parseInt(coordParts[1], 10) - 1;
-                    h.Color = c;
-                    h.User = user;
-                    h.Timestamp = (new Date()).getTime();
-                    sceneHistory.push(h);
-                    //localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
+                for (var i = 0; i < coordSets.length; i++) {
 
-                    lastState[h.X][h.Y].u = state[h.X][h.Y].u;
-                    lastState[h.X][h.Y].t = state[h.X][h.Y].t;
-                    lastState[h.X][h.Y].c = state[h.X][h.Y].c;
 
-                    state[h.X][h.Y].u = h.User;
-                    state[h.X][h.Y].t = h.Timestamp;
-                    state[h.X][h.Y].c = h.Color;
 
-                    localStorage.setItem('pbn-' + config.Name + '-state', JSON.stringify(state));
+                    var coordParts = coordSets[i].split(',');
+
+                    if (coordParts.length == 2) {
+
+                        var p = new PendingDraw();
+                        p.X = parseInt(coordParts[0].trim(), 10) - 1;
+                        p.Y = parseInt(coordParts[1].trim(), 10) - 1;
+                        p.Color = c;
+                        p.Delay = i + redrawTimer;
+                        pendingDraws.push(p);
+
+                        //DrawCell(parseInt(coordParts[0].trim(), 10) - 1, parseInt(coordParts[1].trim(), 10) - 1, c);
+
+                        if (!document.getElementsByTagName('body')[0].classList.contains('obs')) {
+                            var str = '<p>' + user + ": " + c + " " + coordParts[0] + "," + coordParts[1] + '</p>';
+                            document.getElementById('sceneHistory').insertAdjacentHTML('afterbegin', str);
+                        }
+
+
+                        var h = new PaintEvent();
+                        h.X = parseInt(coordParts[0], 10) - 1;
+                        h.Y = parseInt(coordParts[1], 10) - 1;
+                        h.Color = c;
+                        h.User = user;
+                        h.Timestamp = (new Date()).getTime();
+                        sceneHistory.push(h);
+                        //localStorage.setItem('pbn-' + config.Name + '-history', JSON.stringify(sceneHistory));
+
+                        lastState[h.X][h.Y].u = state[h.X][h.Y].u;
+                        lastState[h.X][h.Y].t = state[h.X][h.Y].t;
+                        lastState[h.X][h.Y].c = state[h.X][h.Y].c;
+
+                        state[h.X][h.Y].u = h.User;
+                        state[h.X][h.Y].t = h.Timestamp;
+                        state[h.X][h.Y].c = h.Color;
+
+                    }
+
                 }
+                localStorage.setItem('pbn-' + config.Name + '-state', JSON.stringify(state));
             }
+
+
+
 
 
         }
@@ -1188,7 +1402,7 @@
 
 
         function OnEmoteLoaded(e) {
-           // console.log(e);
+            // console.log(e);
             var parts;
             if (e.path) {
                 parts = e.path[0].src.split('/');
@@ -1219,18 +1433,16 @@
                 }
             }
 
-            console.log(emotes[idx]);
-
-
             CreateAnimation(idx);
         }
 
         var animations = [
+            //draw "slide-in" left to right
             function (origin, emoteIdx) {
                 for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
                     var anim = new AnimationFrame();
                     anim.Countdown = x * 2;
-                    anim.Duration = 60;
+                    anim.Duration = 90;
                     anim.EmoteID = emoteIdx;
 
                     for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
@@ -1239,14 +1451,97 @@
                             h.X = origin.X + x;
                             h.Y = origin.Y + y;
                             h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
-                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight)
+                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
                                 anim.DrawOrders.push(h);
+                                // animationState[h.X][h.Y]++;
+                            }
                         }
                     }
 
                     pendingAnimations.push(anim);
                 }
             },
+
+            //draw "slide-in" right to left
+            function (origin, emoteIdx) {
+                for (var x = emotes[emoteIdx].img.width - 1; x >= 0; x--) {
+                    var anim = new AnimationFrame();
+                    anim.Countdown = (emotes[emoteIdx].img.width - 1 - x) * 2;
+                    anim.Duration = 90;
+                    anim.EmoteID = emoteIdx;
+
+                    for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
+                        if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
+                            var h = new PaintEvent();
+                            h.X = origin.X + x;
+                            h.Y = origin.Y + y;
+                            h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
+                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
+                                anim.DrawOrders.push(h);
+                                // animationState[h.X][h.Y]++;
+                            }
+
+                        }
+                    }
+
+                    pendingAnimations.push(anim);
+                }
+            },
+
+            //draw "slide-in" top to bottom
+            function (origin, emoteIdx) {
+                for (var y = 0; y < emotes[emoteIdx].img.height; y++) {
+                    var anim = new AnimationFrame();
+                    anim.Countdown = y * 2;
+                    anim.Duration = 90;
+                    anim.EmoteID = emoteIdx;
+
+                    for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
+                        if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
+                            var h = new PaintEvent();
+                            h.X = origin.X + x;
+                            h.Y = origin.Y + y;
+                            h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
+                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
+                                anim.DrawOrders.push(h);
+                                //animationState[h.X][h.Y]++;
+                            }
+                        }
+                    }
+
+                    pendingAnimations.push(anim);
+                }
+            },
+
+
+            //draw "slide-in" bottom to top
+            function (origin, emoteIdx) {
+                for (var y = emotes[emoteIdx].img.height - 1; y >= 0; y--) {
+                    var anim = new AnimationFrame();
+                    anim.Countdown = (emotes[emoteIdx].img.height - 1 - y) * 2;
+                    anim.Duration = 90;
+                    anim.EmoteID = emoteIdx;
+
+                    for (var x = 0; x < emotes[emoteIdx].img.width; x++) {
+                        if (IsPixelOpaque(emotes[emoteIdx].data, x, y)) {
+                            var h = new PaintEvent();
+                            h.X = origin.X + x;
+                            h.Y = origin.Y + y;
+                            h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
+                            if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
+                                anim.DrawOrders.push(h);
+                                //animationState[h.X][h.Y]++;
+                            }
+                        }
+                    }
+
+                    pendingAnimations.push(anim);
+                }
+            },
+
+
+
+            //random draw-in
             function (origin, emoteIdx) {
                 var drawPts = [];
 
@@ -1258,42 +1553,81 @@
                     }
                 }
 
-                var frameCounter = 0;
+                var frameCounter = 0, its = 45;
 
-                while (drawPts.length > 0) {
-                    var idx = RandomInt(0, drawPts.length);
+                var ptsPer = Math.ceil(drawPts.length / its);
 
-                    var anim = new AnimationFrame();
-                    anim.Countdown = Math.floor(frameCounter/5);
-                    anim.Duration = 120;
-                    anim.EmoteID = emoteIdx;
 
-                    var h = new PaintEvent();
-                    h.X = drawPts[idx].X;
-                    h.Y = drawPts[idx].Y;
-                    h.Color = GetPixelFromImageData(emotes[emoteIdx].data, h.X, h.Y);
-                    anim.DrawOrders.push(h);
 
-                    pendingAnimations.push(anim);
+                for (var frame = 0; frame < its; frame++) {
+                    for (var i = 0; i < ptsPer; i++) {
+                        if (drawPts.length > 0) {
+                            var idx = RandomInt(0, drawPts.length);
 
-                    frameCounter++;
-                    drawPts.splice(idx, 1);
+                            var anim = new AnimationFrame();
+                            anim.Countdown = frame; //Math.floor(frameCounter / 5);
+                            anim.Duration = 90;
+                            anim.EmoteID = emoteIdx;
+
+                            try {
+                                var h = new PaintEvent();
+                                h.X = drawPts[idx].X;
+                                h.Y = drawPts[idx].Y;
+                                h.Color = GetPixelFromImageData(emotes[emoteIdx].data, h.X, h.Y);
+                                anim.DrawOrders.push(h);
+                                //animationState[h.X][h.Y]++;
+                                pendingAnimations.push(anim);
+                            }
+                            catch (e) {
+                                console.log(e);
+                            }
+
+
+                            frameCounter++;
+                            drawPts.splice(idx, 1);
+                        }
+                    }
+
                 }
 
-            }
+            },
+
+            //horizontal slices
+            //function (origin, emoteIdx) {
+            //    var tempList = Array.apply(null, { length: emotes[emoteIdx].img.height }).map(Number.call, Number);
+
+
+            //    var frameCounter = 0;
+            //    while (tempList.length > 0) {
+            //        var rndIdx = RandomInt(0, tempList.length);
+            //        var y = tmpList[rndIdx];
+
+            //        var dir = y % 2 == 0 ? 1 : -1;
+
+
+
+
+
+
+
+            //        tempList.splice(rndIdx, 1);
+            //    }
+
+
+            //}
         ]
 
         function CreateAnimation(emoteIdx) {
 
-            var origin = new Point(RandomInt(0, config.GridWidth- emotes[emoteIdx].img.width-1), RandomInt(0,config.GridHeight- emotes[emoteIdx].img.height-1)),
+            var origin = new Point(RandomInt(0, config.GridWidth - emotes[emoteIdx].img.width - 1), RandomInt(0, config.GridHeight - emotes[emoteIdx].img.height - 1)),
                 i = RandomInt(0, animations.length);
-
+            //i = 5;
             animations[i](origin, emoteIdx);
         }
 
         function IsPixelOpaque(data, x, y) {
             var idx = (data.width * y + x) * 4;
-            return data.data[idx + 3] >0;
+            return data.data[idx + 3] > 0;
         }
 
         function GetPixelFromImageData(data, x, y) {
@@ -1302,79 +1636,115 @@
         }
 
         function AnimationTick() {
-            //console.log('tick');
             var removeList = [];
+            if (redrawTimer > 0)
+                redrawTimer--;
+
+            for (var i = 0; i < pendingDraws.length; i++) {
+
+                if (pendingDraws[i].Delay <= 0) {
+                    removeList.push(i);
+                    DrawCell(pendingDraws[i].X, pendingDraws[i].Y, pendingDraws[i].Color);
+
+                }
+                else {
+
+                    pendingDraws[i].Delay--;
+
+                }
+
+            }
+
+            for (var i = removeList.length - 1; i >= 0; i--) {
+                pendingDraws.splice(removeList[i], 1);
+            }
+
+            removeList = [];
+
             for (var i = 0; i < pendingAnimations.length; i++) {
 
-                if (pendingAnimations[i].Countdown == 0) { //draw anim frame
+
+
+
+                if (pendingAnimations[i].Countdown == 0) {
                     pendingAnimations[i].DrawOrders.forEach(function (x) {
                         DrawCell(x.X, x.Y, x.Color);
+                        animationState[x.X][x.Y]++;
                     });
 
                 }
-                else if (pendingAnimations[i].Countdown<0 && Math.abs(pendingAnimations[i].Countdown) == pendingAnimations[i].Duration) { //undraw
-                    pendingAnimations[i].DrawOrders.forEach(function (pt) {
-                        try {
-                            DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
-                        }
-                        catch (e) {
-                            console.log('tried to draw ' + pt.X + ', ' + pt.Y);
-                        }
+                else if (pendingAnimations[i].Countdown <= -pendingAnimations[i].Duration) { //undraw
+                    // pendingAnimations[i].DrawOrders.forEach(function (pt) {
+
+                    for (var j = 0; j < pendingAnimations[i].DrawOrders.length; j++) {
+                        var pt = pendingAnimations[i].DrawOrders[j];
+
+                        animationState[pt.X][pt.Y]--;
+
+                        if (animationState[pt.X][pt.Y] == 0) {
+                            if (state[pt.X][pt.Y].u == 'start') {
+                                DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
+                            }
 
 
-                        if (config.GridUnderlap && config.GridEnabled) {
-                            ctx.strokeStyle = config.GridColor;
+                            if (config.GridUnderlap && config.GridEnabled && state[pt.X][pt.Y].u == 'start') {
+                                ctx.strokeStyle = config.GridColor;
 
-                            //if (config.GridEmphasisEnabled && (pt.X + 1) % config.GridEmphasisFrequency == 0) {
-                            //    ctx.strokeStyle = config.GridEmphasisColor;
-                            //}
-
-                            var x = pt.X * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
-                                y = pt.Y * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
-                                size = config.GridSize + (config.GridUnderlap ? 0 : 1);
-                            ctx.beginPath();
-                            ctx.moveTo(x, y+size);
-                            ctx.lineTo(x + size, y + size);
-                            ctx.lineTo(x + size, y);
-                            ctx.stroke();
+                                var x = pt.X * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
+                                    y = pt.Y * (config.GridSize + (config.GridUnderlap ? 0 : 1)) - 0.5,
+                                    size = config.GridSize + (config.GridUnderlap ? 0 : 1);
+                                ctx.beginPath();
+                                ctx.moveTo(x, y + size);
+                                ctx.lineTo(x + size, y + size);
+                                ctx.lineTo(x + size, y);
+                                ctx.stroke();
 
 
-                            if (config.GridEmphasisEnabled) {
-                                ctx.strokeStyle = config.GridEmphasisColor;
+                                if (config.GridEmphasisEnabled) {
+                                    ctx.strokeStyle = config.GridEmphasisColor;
 
-                                if ((pt.X + 1) % config.GridEmphasisFrequency == 0) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(x + size, y);
-                                    ctx.lineTo(x + size, y + size);
-                                    ctx.stroke();
-                                }
+                                    if ((pt.X + 1) % config.GridEmphasisFrequency == 0) {
+                                        ctx.beginPath();
+                                        ctx.moveTo(x + size, y);
+                                        ctx.lineTo(x + size, y + size);
+                                        ctx.stroke();
+                                    }
 
-                                if ((pt.Y + 1) % config.GridEmphasisFrequency == 0) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(x, y + size);
-                                    ctx.lineTo(x + size, y + size);
-                                    ctx.stroke();
+                                    if ((pt.Y + 1) % config.GridEmphasisFrequency == 0) {
+                                        ctx.beginPath();
+                                        ctx.moveTo(x, y + size);
+                                        ctx.lineTo(x + size, y + size);
+                                        ctx.stroke();
+                                    }
+
+
                                 }
 
 
                             }
 
+                            if (state[pt.X][pt.Y].u != 'start') {
+                                DrawCell(pt.X, pt.Y, state[pt.X][pt.Y].c);
+                            }
 
                         }
 
 
+                    }
 
-
-                    });
+                    //});
                     removeList.push(i);
                 }
 
                 pendingAnimations[i].Countdown--;
 
+
+
+
             }
 
             for (var i = removeList.length - 1; i >= 0; i--) {
-                pendingAnimations.splice(i, 1);
+                pendingAnimations.splice(removeList[i], 1);
             }
 
             requestAnimationFrame(AnimationTick);
