@@ -846,7 +846,7 @@
 
             }
             else {
-                var ppt = sceneHistory.length / duration, //how many pixels per tick to draw
+                var ppt = duration / sceneHistory.length, 
                     currDelay = 1;
                 redrawTimer = duration + 1;
 
