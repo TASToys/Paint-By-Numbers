@@ -779,6 +779,10 @@
                                 isSub = 1;
                                 break;
                             }
+                            else if (msgParts[i] == 'msg-id=subgift') {
+                                isSub = 2;
+                                break;
+                            }
 
                         }
 
@@ -812,7 +816,7 @@
 
         function GenerateRedraw(subImg) {
 
-            var duration = 60 * 7;
+            var duration = 60 * 10;
 
             var gridStatus = Create2DArray(config.GridWidth);
 
