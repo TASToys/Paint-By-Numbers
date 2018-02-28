@@ -818,11 +818,13 @@
 
             var duration = 60 * 10;
 
-            var gridStatus = Create2DArray(config.GridWidth);
+            sceneHistory.sort((a, b) => { return parseInt(a.Timestamp, 10) > parseInt(b.Timestamp) ? 1 : -1; });
+
+           // var gridStatus = Create2DArray(config.GridWidth);
 
             for (var x = 0; x < config.GridWidth; x++) {
                 for (var y = 0; y < config.GridHeight; y++) {
-                    gridStatus[x][y] = 0;
+                   // gridStatus[x][y] = 0;
                     var p = new PendingDraw();
                     p.X = x;
                     p.Y = y;
@@ -832,11 +834,13 @@
                 }
             }
 
-            //one pixel per frame
-            if (sceneHistory.length <= duration) {
-                redrawTimer = sceneHistory.length + 1;
+            var lim = sceneHistory.length;
 
-                for (var i = 0; i < sceneHistory.length; i++) {
+            //one pixel per frame
+            if (lim <= duration) {
+                redrawTimer = lim + 1;
+
+                for (var i = 0; i < lim; i++) {
                     var h = sceneHistory[i];
                     var p = new PendingDraw();
                     p.X = h.X;
@@ -844,16 +848,16 @@
                     p.Color = h.Color;
                     p.Delay = i + 1;
                     pendingDraws.push(p);
-                    gridStatus[h.X][h.Y] = 1;
+                   // gridStatus[h.X][h.Y] = 1;
                 }
 
             }
             else {
-                var ppt = duration / sceneHistory.length,
+                var ppt = duration / lim,
                     currDelay = 1;
                 redrawTimer = duration + 1;
 
-                for (var i = 0; i < sceneHistory.length; i++) {
+                for (var i = 0; i < lim; i++) {
                     var h = sceneHistory[i];
                     var p = new PendingDraw();
                     p.X = h.X;
@@ -862,32 +866,12 @@
                     p.Delay = Math.floor(currDelay);
 
                     pendingDraws.push(p);
-                    currDelay += ppt;
-                    gridStatus[h.X][h.Y] = 1;
+                    currDelay = 1 + ((1 + i) * ppt);
+                  //  gridStatus[h.X][h.Y] = 1;
                 }
             }
 
             
-
-            //for (var x = 0; x < config.GridWidth; x++) {
-            //    for (var y = 0; y < config.GridHeight; y++) {
-            //        if (gridStatus[x][y] == 0) {
-            //            var p = new PendingDraw();
-            //            p.X = x;
-            //            p.Y = y;
-            //            if (state[x] && state[x][y])
-            //                p.Color = state[x][y].c;
-            //            else
-            //                p.Color = config.BackgroundColor;
-
-            //            p.Delay = RandomInt(1, 1 + duration);
-            //            pendingDraws.push(p);
-
-                        
-            //        }
-            //    }
-            //}
-
 
         }
 
