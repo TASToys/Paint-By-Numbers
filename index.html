@@ -236,6 +236,11 @@
                     <p class="info">If a name is set, then this config can be loaded with only the name</p>
                 </li>
                 <li>
+                    <label>Twitch Client ID:</label>
+                    <input type="text" id="txtClientID" />
+                    <p class="info">Client ID is required to enable Cheer support</p>
+                </li>
+                <li>
                     <label>Bot name:</label>
                     <input type="text" id="txtBotName" />
                 </li>
@@ -272,6 +277,8 @@
             <div id="sceneHistory"></div>
         </div>
     </div>
+
+    <script src="https://cdn.rawgit.com/buzzfeed/libgif-js/master/libgif.js"></script>
 
     <script>
 
@@ -636,7 +643,7 @@
 
             pendingAnimations = [],
 
-            canTalk=false,
+            canTalk = false,
 
             debug = true; //switch to log detailed info to console
 
@@ -655,6 +662,7 @@
             GridHeight: 0,
             TwitchChannels: [],
             Name: 'default',
+            ClientID: '',
             BotName: '',
             OAuthCode: ''
         };
@@ -692,6 +700,46 @@
                 }
             }
 
+
+            /*
+
+@badges=moderator/1,subscriber/0,bits/1;
+            bits=101;
+            color=#1E90FF;
+            display-name=timeshifter08;
+            emotes=;
+            id=a11b9cc4-7145-4ae2-b9d0-e21b2087256e;
+            mod=1;
+            room-id=70067886;
+            subscriber=1;
+            tmi-sent-ts=1525658907286;
+            turbo=0;
+            user-id=61927669;
+            user-type=mod
+:timeshifter08!timeshifter08@timeshifter08.tmi.twitch.tv PRIVMSG #dwangoac :cheer1 test cheer100
+
+
+
+@badges=moderator/1,subscriber/0,bits/100;
+            bits=100;
+            color=#1E90FF;
+            display-name=timeshifter08;
+            emotes=;
+            id=1c01c9d4-0eda-4ea4-bb7f-d4737d57172b;
+            mod=1;
+            room-id=70067886;
+            subscriber=1;
+            tmi-sent-ts=1525659031987;
+            turbo=0;
+            user-id=61927669;
+            user-type=mod
+:timeshifter08!timeshifter08@timeshifter08.tmi.twitch.tv PRIVMSG #dwangoac :cheer50 kappa50
+
+
+
+            */
+
+
             //show raw data
             ws.onmessage = function (msgEvent) {
                 var lines = msgEvent.data.split('\r\n');
@@ -709,9 +757,10 @@
                         ws.send('PONG ' + line.split(':')[1]);
                     }
                     else if (lineParts[2] == 'PRIVMSG') {
-                        console.log('hi');
+                        //console.log('hi');
                         var parts = line.split('PRIVMSG');
                         var preparts = parts[0].split(';');
+                        var channel = parts[1].trim().split(' ')[0];
                         var user = preparts[preparts.length - 1].split(':')[1].split('!')[0];
 
                         parts[1] = parts[1].trim();
@@ -724,7 +773,9 @@
                         var hasEmote = false,
                             emoteIdx = -1,
                             isCommand = false,
-                            userIsSub = false;
+                            userIsSub = false,
+                            hasCheer = false,
+                            cheerIdx = -1;
 
                         for (var i = 0; i < preparts.length; i++) {
 
@@ -758,6 +809,15 @@
 
                                     }
 
+                                    if (msg.trim().toLowerCase() == '!pbn') {
+                                        isCommand = true;
+                                        var msg = `The grid is Paint By Numbers, an interactive drawing toy. Draw with "<colorname> x,y", where <colorname> is a named color, #hex, or rgb(), and x,y are 1-indexed coordinates. Grid Size ${config.GridWidth}x${config.GridHeight}. Now chatroom enabled; click up top and join #pbn to paint!`;
+                                        if (canTalk) {
+                                            console.log(`PRIVMSG ${channel} :${msg}`);
+                                            ws.send(`PRIVMSG ${channel} :${msg}`);
+                                        }
+                                    }
+
                                     if (msg.trim().toLowerCase() == '!redraw') {
 
                                         GenerateRedraw(-1);
@@ -768,6 +828,12 @@
                                 }
                             }
 
+                            if (preparts[i].indexOf('bits') == 0) {
+                                hasCheer = true;
+
+
+                            }
+
 
                             if (preparts[i].indexOf('emotes=') == 0 && preparts[i].trim() != 'emotes=') {
                                 var emoteList = preparts[i].split('=')[1].split('/');
@@ -775,11 +841,50 @@
                                 hasEmote = true;
 
                             }
+
+
+                            // if (preparts[i].indexof('')) {
+
+                            //}
                         }
 
                         if (!isCommand) {
 
-                            if (hasEmote)
+                            if (hasCheer) {
+
+                                var msgWords = msg.toLowerCase().split(' ');
+                                var cheersFound = [];
+
+                                var cheerTest = /^([a-z]+)(\d+)$/;
+                                var cheerIdx = 0;
+
+                                for (i in msgWords) {
+                                    if (cheerTest.test(msgWords[i])) {
+                                        var cheerResult = cheerTest.exec(msgWords[i]);
+
+                                        if (validEmotes.indexOf(cheerResult[1]) > -1) {
+                                            var o = { prefix: cheerResult[1], level: 0 };
+                                            for (j in cheerLevels) {
+                                                if (cheerResult[2] >= cheerLevels[j])
+                                                    o.level = cheerLevels[j];
+                                                else
+                                                    break;
+                                            }
+
+                                            cheersFound.push(o);
+                                            if (!cheers[`${o.prefix}${o.level}`]) {
+                                                cheers[`${o.prefix}${o.level}`] = [];
+                                                LoadCheerData(`${o.prefix}${o.level}`);
+                                            }
+                                        }
+
+                                    }
+                                }
+
+                                console.log(cheersFound);
+
+                            }
+                            else if (hasEmote)
                                 ParseMessage('manual', 'emote ' + emoteIdx);
                             else
                                 ParseMessage(user, msg, userIsSub);
@@ -837,7 +942,7 @@
             }
         }
 
-        
+
 
         function GenerateRedraw(subImg) {
 
@@ -845,11 +950,11 @@
 
             sceneHistory.sort((a, b) => { return parseInt(a.Timestamp, 10) > parseInt(b.Timestamp) ? 1 : -1; });
 
-           // var gridStatus = Create2DArray(config.GridWidth);
+            // var gridStatus = Create2DArray(config.GridWidth);
 
             for (var x = 0; x < config.GridWidth; x++) {
                 for (var y = 0; y < config.GridHeight; y++) {
-                   // gridStatus[x][y] = 0;
+                    // gridStatus[x][y] = 0;
                     var p = new PendingDraw();
                     p.X = x;
                     p.Y = y;
@@ -873,7 +978,7 @@
                     p.Color = h.Color;
                     p.Delay = i + 1;
                     pendingDraws.push(p);
-                   // gridStatus[h.X][h.Y] = 1;
+                    // gridStatus[h.X][h.Y] = 1;
                 }
 
             }
@@ -892,11 +997,11 @@
 
                     pendingDraws.push(p);
                     currDelay = 1 + ((1 + i) * ppt);
-                  //  gridStatus[h.X][h.Y] = 1;
+                    //  gridStatus[h.X][h.Y] = 1;
                 }
             }
 
-            
+
 
         }
 
@@ -987,6 +1092,8 @@
             txtName.oninput = UpdateSettingsTrigger;
             txtBotName.oninput = UpdateSettingsTrigger;
             txtOAuthCode.oninput = UpdateSettingsTrigger;
+            txtClientID.oninput = UpdateSettingsTrigger;
+
             txtChat.onkeydown = ManualChat;
 
             //create queryList array
@@ -1097,6 +1204,46 @@
             AnimationTick();
         }
 
+        var _emoteReq,
+            validEmotes = [],
+            cheerLevels = [],
+            cheerURL = 'https://d3aqoihi2n8ty8.cloudfront.net/actions/{prefix}/light/animated/{tier}/1.5.gif',
+            cheers = {},
+            cheerSize = 42;
+
+        function LoadCheerEmotes() {
+
+            _emoteReq = new XMLHttpRequest();
+
+            _emoteReq.onreadystatechange = function () {
+
+                if (this.readyState == 4 && this.status === 200) {
+                    var json = JSON.parse(this.responseText);
+
+                    validEmotes = [];
+                    cheerLevels = [];
+
+                    for (i in json.actions) {
+                        validEmotes.push(json.actions[i].prefix.toLowerCase());
+                    }
+
+                    for (i in json.actions[0].tiers) {
+                        cheerLevels.push(json.actions[0].tiers[i].min_bits);
+                    }
+
+                    //console.log(json);
+                    //console.log(validEmotes);
+                    //console.log(cheerLevels);
+                    //console.log(validEmotes.length * cheerLevels.length);
+                }
+            }
+
+            _emoteReq.open('GET', 'https://api.twitch.tv/kraken/bits/actions');
+            _emoteReq.setRequestHeader('Accept', 'application/vnd.twitchtv.v5+json');
+            _emoteReq.setRequestHeader('Client-ID', config.ClientID);
+            _emoteReq.send();
+        }
+
         //#endregion
 
 
@@ -1121,6 +1268,7 @@
             config.GridEmphasisEnabled = cbShowGridEmphasis.checked;
             config.GridEmphasisFrequency = parseInt(txtEmphasisFrequency.value, 10);
             config.GridEmphasisColor = colEmphasisColor.value;
+            config.ClientID = txtClientID.value;
             config.BotName = txtBotName.value;
             config.OAuthCode = txtOAuthCode.value;
 
@@ -1170,6 +1318,7 @@
             colEmphasisColor.value = config.GridEmphasisColor;
             txtChannels.value = config.TwitchChannels.join(', ');
             txtName.value = config.Name;
+            txtClientID.value = config.ClientID;
             txtBotName.value = config.BotName;
             txtOAuthCode.value = config.OAuthCode;
 
@@ -1182,10 +1331,15 @@
                 canTalk = true;
 
 
+
             UpdateURLs();
 
             isLoading = false;
             DrawGrid();
+
+            if (config.ClientID != '')
+                LoadCheerEmotes();
+
 
             //if (localStorage.getItem(configName + '-history') != null)
             //    sceneHistory = JSON.parse(localStorage.getItem(configName + '-history'));
@@ -1332,7 +1486,7 @@
             text = text.trim().toLowerCase();
             var c, coords;
 
-            
+
 
             if (text.indexOf('rgb') == 0) {
                 var parts = text.replace('rgb(', '').split(')');
@@ -1494,7 +1648,7 @@
                             h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
                             if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
                                 anim.DrawOrders.push(h);
-                               // animationState[h.X][h.Y]++;
+                                // animationState[h.X][h.Y]++;
                             }
                         }
                     }
@@ -1505,9 +1659,9 @@
 
             //draw "slide-in" right to left
             function (origin, emoteIdx) {
-                for (var x = emotes[emoteIdx].img.width-1; x >=0; x--) {
+                for (var x = emotes[emoteIdx].img.width - 1; x >= 0; x--) {
                     var anim = new AnimationFrame();
-                    anim.Countdown = (emotes[emoteIdx].img.width-1-x) * 2;
+                    anim.Countdown = (emotes[emoteIdx].img.width - 1 - x) * 2;
                     anim.Duration = 90;
                     anim.EmoteID = emoteIdx;
 
@@ -1519,7 +1673,7 @@
                             h.Color = GetPixelFromImageData(emotes[emoteIdx].data, x, y);
                             if (h.X >= 0 && h.X < config.GridWidth && h.Y >= 0 && h.Y < config.GridHeight) {
                                 anim.DrawOrders.push(h);
-                               // animationState[h.X][h.Y]++;
+                                // animationState[h.X][h.Y]++;
                             }
 
                         }
@@ -1594,7 +1748,7 @@
                     }
                 }
 
-                var frameCounter = 0, its=45;
+                var frameCounter = 0, its = 45;
 
                 var ptsPer = Math.ceil(drawPts.length / its);
 
@@ -1628,7 +1782,7 @@
                             drawPts.splice(idx, 1);
                         }
                     }
-                    
+
                 }
 
             },
@@ -1653,7 +1807,7 @@
 
             //        tempList.splice(rndIdx, 1);
             //    }
-                
+
 
             //}
         ]
@@ -1693,7 +1847,7 @@
                     pendingDraws[i].Delay--;
 
                 }
-                
+
             }
 
             for (var i = removeList.length - 1; i >= 0; i--) {
