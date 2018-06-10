@@ -9,7 +9,7 @@
             outline: 0;
             list-style: none;
             font-size: 16px;
-            font-family: ‘Helvetica Neue’, Helvetica, Arial, sans-serif;
+            font-family: ï¿½Helvetica Neueï¿½, Helvetica, Arial, sans-serif;
         }
 
 
@@ -837,7 +837,7 @@
             }
         }
 
-        
+
 
         function GenerateRedraw(subImg) {
 
@@ -896,7 +896,7 @@
                 }
             }
 
-            
+
 
         }
 
@@ -1332,7 +1332,7 @@
             text = text.trim().toLowerCase();
             var c, coords;
 
-            
+
 
             if (text.indexOf('rgb') == 0) {
                 var parts = text.replace('rgb(', '').split(')');
@@ -1628,7 +1628,7 @@
                             drawPts.splice(idx, 1);
                         }
                     }
-                    
+
                 }
 
             },
@@ -1653,7 +1653,7 @@
 
             //        tempList.splice(rndIdx, 1);
             //    }
-                
+
 
             //}
         ]
@@ -1693,12 +1693,10 @@
                     pendingDraws[i].Delay--;
 
                 }
-                
+
             }
 
-            for (var i = removeList.length - 1; i >= 0; i--) {
-                pendingDraws.splice(removeList[i], 1);
-            }
+            pendingDraws = pendingDraws.filter((_, i) => !removeList.includes(i));
 
             removeList = [];
 
@@ -1784,9 +1782,7 @@
 
             }
 
-            for (var i = removeList.length - 1; i >= 0; i--) {
-                pendingAnimations.splice(removeList[i], 1);
-            }
+            pendingAnimations = pendingAnimations.filter((_, i) => !removeList.includes(i));
 
             requestAnimationFrame(AnimationTick);
         }
