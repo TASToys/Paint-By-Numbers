@@ -9,7 +9,7 @@
             outline: 0;
             list-style: none;
             font-size: 16px;
-            font-family: ‘Helvetica Neue’, Helvetica, Arial, sans-serif;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         }
 
 
@@ -837,13 +837,13 @@
             }
         }
 
-        
+
 
         function GenerateRedraw(subImg) {
 
             var duration = 60 * 10;
 
-            sceneHistory.sort((a, b) => { return parseInt(a.Timestamp, 10) > parseInt(b.Timestamp) ? 1 : -1; });
+            sceneHistory.sort((a, b) => a.Timestamp - b.Timestamp);
 
            // var gridStatus = Create2DArray(config.GridWidth);
 
@@ -896,7 +896,7 @@
                 }
             }
 
-            
+
 
         }
 
@@ -1332,7 +1332,7 @@
             text = text.trim().toLowerCase();
             var c, coords;
 
-            
+
 
             if (text.indexOf('rgb') == 0) {
                 var parts = text.replace('rgb(', '').split(')');
@@ -1628,7 +1628,7 @@
                             drawPts.splice(idx, 1);
                         }
                     }
-                    
+
                 }
 
             },
@@ -1653,7 +1653,7 @@
 
             //        tempList.splice(rndIdx, 1);
             //    }
-                
+
 
             //}
         ]
@@ -1693,7 +1693,7 @@
                     pendingDraws[i].Delay--;
 
                 }
-                
+
             }
 
             for (var i = removeList.length - 1; i >= 0; i--) {
