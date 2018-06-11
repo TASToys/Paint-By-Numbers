@@ -1696,9 +1696,7 @@
 
             }
 
-            for (var i = removeList.length - 1; i >= 0; i--) {
-                pendingDraws.splice(removeList[i], 1);
-            }
+            pendingDraws = pendingDraws.filter((_, i) => !removeList.includes(i));
 
             removeList = [];
 
@@ -1784,9 +1782,7 @@
 
             }
 
-            for (var i = removeList.length - 1; i >= 0; i--) {
-                pendingAnimations.splice(removeList[i], 1);
-            }
+            pendingAnimations = pendingAnimations.filter((_, i) => !removeList.includes(i));
 
             requestAnimationFrame(AnimationTick);
         }
