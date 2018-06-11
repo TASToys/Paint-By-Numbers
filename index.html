@@ -843,7 +843,7 @@
 
             var duration = 60 * 10;
 
-            sceneHistory.sort((a, b) => { return parseInt(a.Timestamp, 10) > parseInt(b.Timestamp) ? 1 : -1; });
+            sceneHistory.sort((a, b) => a.Timestamp - b.Timestamp);
 
            // var gridStatus = Create2DArray(config.GridWidth);
 
