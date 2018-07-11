@@ -638,7 +638,7 @@
 
             canTalk=false,
 
-            debug = true; //switch to log detailed info to console
+            debug = false; //switch to log detailed info to console
 
         var config = {
             CanvasWidth: 1280,
@@ -709,7 +709,7 @@
                         ws.send('PONG ' + line.split(':')[1]);
                     }
                     else if (lineParts[2] == 'PRIVMSG') {
-                        console.log('hi');
+                        //console.log('hi');
                         var parts = line.split('PRIVMSG');
                         var preparts = parts[0].split(';');
                         var user = preparts[preparts.length - 1].split(':')[1].split('!')[0];
