@@ -1,0 +1,98 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title></title>
+    <style>
+        * {
+            margin:0;
+            padding:0;
+            outline:0;
+            box-sizing:border-box;
+        }
+
+        html {
+            width: 100%;
+            height: 100%;
+            background-color:white;
+        }
+
+        body {
+            width:100%;
+            height:100%;
+        }
+
+        #content {
+            font-size:32px;
+            color:white;
+        }
+    </style>
+</head>
+<body onresize="OnBodyResize">
+    <div id="content"></div>
+
+    <script>
+
+        
+        var request = window.indexedDB.open("MyTestDatabase", 1);
+
+        var db;
+        var request = indexedDB.open("MyTestDatabase");
+
+        request.onerror = function (event) {
+            //alert("Database error: " + event.target.errorCode);
+            document.getElementsByTagName('body')[0].style.backgroundColor = 'red';
+        };
+        request.onsuccess = function (event) {
+            db = event.target.result;
+           // alert('success');
+            document.getElementsByTagName('body')[0].style.backgroundColor = 'green';
+        };
+
+
+        
+
+
+        function OnBodyResize() {
+            document.getElementById('content').innerHTML = window.innerWidth + ',' + window.innerHeight;
+        }
+
+        OnBodyResize();
+
+        var _emoteReq,
+            validEmotes = [],
+            cheerLevels = [],
+            cheerURL = 'https://d3aqoihi2n8ty8.cloudfront.net/actions/{prefix}/light/animated/{tier}/1.5.gif',
+            cheers = {},
+            cheerSize = 42;
+
+        function LoadCheerEmotes() {
+
+            _emoteReq = new XMLHttpRequest();
+
+            _emoteReq.onreadystatechange = function () {
+
+                if (this.readyState == 4 && this.status === 200) {
+                    var json = JSON.parse(this.responseText);
+
+                    validEmotes = [];
+                    cheerLevels = [];
+
+                    for (i in json.actions) {
+                        validEmotes.push(json.actions[i].prefix.toLowerCase());
+                    }
+
+                    for (i in json.actions[0].tiers) {
+                        cheerLevels.push(json.actions[0].tiers[i].min_bits);
+                    }
+
+                }
+            }
+
+            _emoteReq.open('GET', 'https://api.twitch.tv/kraken/bits/actions');
+            _emoteReq.setRequestHeader('Accept', 'application/vnd.twitchtv.v5+json');
+            _emoteReq.setRequestHeader('Client-ID', config.ClientID);
+            _emoteReq.send();
+        }
+
+    </script>
+</body>
+</html>
