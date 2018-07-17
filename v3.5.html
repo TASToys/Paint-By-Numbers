@@ -29,9 +29,28 @@
 <body onresize="OnBodyResize">
     <div id="content"></div>
 
+    <script src="https://timeshifter.github.io/twitch-events/twitch-events.js"></script>
     <script>
 
-        
+        var client;
+
+        (function () {
+            
+            client = new TwitchClient({
+                ClientID: 'abcde12345',
+                Nick: 'botshifter08',
+                Pass: 'oauth:54321edcba',
+                Debug: true
+            });
+
+            client.JoinChannels('timeshifter08');
+
+            LoadCheerEmotes();
+        })();
+
+
+
+        /*
         var request = window.indexedDB.open("MyTestDatabase", 1);
 
         var db;
@@ -43,12 +62,12 @@
         };
         request.onsuccess = function (event) {
             db = event.target.result;
-           // alert('success');
+            // alert('success');
             document.getElementsByTagName('body')[0].style.backgroundColor = 'green';
         };
+        */
 
 
-        
 
 
         function OnBodyResize() {
@@ -92,6 +111,7 @@
             _emoteReq.setRequestHeader('Client-ID', config.ClientID);
             _emoteReq.send();
         }
+
 
     </script>
 </body>
