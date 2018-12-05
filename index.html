@@ -636,7 +636,7 @@
 
             pendingAnimations = [],
 
-            canTalk=false,
+            canTalk = false,
 
             debug = false; //switch to log detailed info to console
 
@@ -775,6 +775,13 @@
                                 hasEmote = true;
 
                             }
+
+                            if (preparts[i].indexOf('bits=') == 0) {
+                                var bitCount = parseInt(preparts[i].split('=')[1], 10);
+                                if (bitCount >= 100)
+                                    GenerateRedraw(-1);
+
+                            }
                         }
 
                         if (!isCommand) {
@@ -840,6 +847,9 @@
 
 
         function GenerateRedraw(subImg) {
+
+            if (redrawTimer > 0)
+                return;
 
             var duration = 60 * 10;
 
