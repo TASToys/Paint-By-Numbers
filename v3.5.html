@@ -29,12 +29,26 @@
 <body onresize="OnBodyResize">
     <div id="content"></div>
 
-    <script src="https://timeshifter.github.io/twitch-events/twitch-events.js"></script>
+    <!--<script src="https://timeshifter.github.io/twitch-events/twitch-events.js"></script>-->
+    <script src="http://localhost/twitch-events/twitch-events.js"></script>
     <script>
 
-        var client;
+        var client //twitch irc client
+            , queryList //query string params
+            ;
 
         (function () {
+
+            //create queryList array
+            if (window.location.search) {
+                var query = window.location.search;
+                var queryParts = query.substring(1).split('&');
+                for (var i = 0; i < queryParts.length; i++) {
+                    var parts = queryParts[i].split('=');
+                    queryList[parts[0].trim()] = parts[1].trim();
+
+                }
+            }
             
             client = new TwitchClient({
                 ClientID: 'abcde12345',
@@ -43,14 +57,34 @@
                 Debug: true
             });
 
-            client.JoinChannels('timeshifter08');
+            client.onPrivmsg = function (user, channel, message) {
+                //console.log('onPrivmsg', { 'Username': user, 'Channel': channel, 'Message': message, 'Timestamp': new Date() });
+            };
+
+            //client.onJoin = function (user, channel) {
+            //    console.log('onJoin', { 'Username': user, 'Channel': channel, 'Timestamp': new Date() });
+            //};
+
+            //client.onPart = function (user, channel) {
+            //    console.log('onPart', { 'Username': user, 'Channel': channel, 'Timestamp': new Date() });
+            //};
+
+            //client.onRoomstate = function (channel, settings) {
+            //    console.log('onRoomstate', { 'Channel': channel, 'Settings': settings, 'Timestamp': new Date() });
+            //};
+
+            client.onUsernotice = function (message) {
+                //console.log(message);
+            };
+
+            client.JoinChannels(['timeshifter08', 'dwangoac', 'chatrooms:70067886:334d02cb-f694-43b4-8ef5-7a9845fa931d']);
 
             LoadCheerEmotes();
         })();
 
 
 
-        /*
+        
         var request = window.indexedDB.open("MyTestDatabase", 1);
 
         var db;
@@ -65,8 +99,52 @@
             // alert('success');
             document.getElementsByTagName('body')[0].style.backgroundColor = 'green';
         };
-        */
+        
 
+
+        /*
+
+
+              if (hasCheer) {
+
+                                var msgWords = msg.toLowerCase().split(' ');
+                                var cheersFound = [];
+
+                                var cheerTest = /^([a-z]+)(\d+)$/;
+                                var cheerIdx = 0;
+
+                                for (i in msgWords) {
+                                    if (cheerTest.test(msgWords[i])) {
+                                        var cheerResult = cheerTest.exec(msgWords[i]);
+
+                                        if (validEmotes.indexOf(cheerResult[1]) > -1) {
+                                            var o = { prefix: cheerResult[1], level: 0 };
+                                            for (j in cheerLevels) {
+                                                if (cheerResult[2] >= cheerLevels[j])
+                                                    o.level = cheerLevels[j];
+                                                else
+                                                    break;
+                                            }
+
+                                            cheersFound.push(o);
+                                            if (!cheers[`${o.prefix}${o.level}`]) {
+                                                cheers[`${o.prefix}${o.level}`] = [];
+                                                LoadCheerData(`${o.prefix}${o.level}`);
+                                            }
+                                        }
+
+                                    }
+                                }
+
+                                console.log(cheersFound);
+
+                            }
+                            else if (hasEmote)
+                                ParseMessage('manual', 'emote ' + emoteIdx);
+                            else
+                                ParseMessage(user, msg, userIsSub);
+
+        */
 
 
 
@@ -108,7 +186,7 @@
 
             _emoteReq.open('GET', 'https://api.twitch.tv/kraken/bits/actions');
             _emoteReq.setRequestHeader('Accept', 'application/vnd.twitchtv.v5+json');
-            _emoteReq.setRequestHeader('Client-ID', config.ClientID);
+            _emoteReq.setRequestHeader('Client-ID', client.ClientID);
             _emoteReq.send();
         }
 
