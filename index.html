@@ -1,5 +1,6 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
+    <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
     <title>Paint By Numbers</title>
     <style>
         * {
@@ -1342,7 +1343,7 @@
 
         function ParseMessage(user, text, userIsSub) {
             text = text.trim().toLowerCase();
-            var c, coords;
+            var c, coords, isUTF8=false;
 
 
 
@@ -1377,6 +1378,12 @@
                     parts.shift();
                     coords = parts.join('');
                 }
+                else{ //utf-8 decode (hopefully)
+                        console.log(text);
+                        console.log(decodeURIComponent(escape(text)));
+                    //set isUTF8=true if it works
+                    //see L1421 for how to add draw orders
+                }
             }
 
             if (user == 'manual') {
@@ -1399,7 +1406,7 @@
                 }
             }
 
-            if (c != undefined) {
+            if (c != undefined && !isUTF8) {
 
                 var coordSets = coords.split(';');
 
